@@ -1,0 +1,46 @@
+name: ESP32-P4 offline slice
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/p4-build.yml"
+      - "CMakeLists.txt"
+      - "main/**"
+      - "sdkconfig.defaults"
+      - "dependencies.lock"
+      - "tests/**"
+  workflow_dispatch:
+
+concurrency:
+  group: launchpad-p4-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static guard tests
+        run: python3 -m unittest discover -s tests -v
+      - name: ESP-IDF v6.0.3 / ESP32-P4 build
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.0.3
+          target: esp32p4
+          path: "."
+      - name: Show exact dependency resolution
+        if: success()
+        run: cat dependencies.lock
+      - name: Retain build and flash arguments for review
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launchpad-p4-offline-${{ github.sha }}
+          path: |
+            build/launchpad.bin
+            build/bootloader/bootloader.bin
+            build/partition_table/partition-table.bin
+            build/flasher_args.json
+            dependencies.lock
+          if-no-files-found: error
+          retention-days: 14
