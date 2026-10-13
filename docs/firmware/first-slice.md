@@ -16,6 +16,8 @@ Refs #6 and #2; does not close either issue.
 - Displays runtime PSRAM capacity on screen and logs if it differs from 32 MiB.
 - Shows three red/green/blue patches for visual panel-bus verification.
 - Enables fixed full backlight (GPIO16) only after LVGL's first paint.
+- Sets the V1.3 reference PSRAM 1.8 V and SPI NOR flash 3.3 V supply domains,
+  and routes application logging to the J10 USB-Serial/JTAG console.
 
 ## Reproducible build and checks
 
@@ -27,9 +29,9 @@ idf.py set-target esp32p4
 idf.py build
 ```
 
-ESP-IDF Component Manager resolves `lvgl/lvgl ==9.4.0`. On the first verified
-CI build, capture and commit the generated `dependencies.lock` so the full
-resolution is preserved. Do not substitute the vendor SDK source: the vendor
+ESP-IDF Component Manager resolves `lvgl/lvgl ==9.4.0`. The `dependencies.lock`
+file is committed from the first successful P4 CI build, preserving exact
+resolved component hashes. Do not substitute the vendor SDK source: the vendor
 repository's licensing status is not suitable for code copying.
 
 The pull-request workflow compiles for the actual ESP32-P4 and retains a

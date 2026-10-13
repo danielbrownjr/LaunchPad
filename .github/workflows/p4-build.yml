@@ -35,7 +35,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: launchpad-p4-offline-${{ github.sha }}
+          name: launchpad-p4-offline-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             build/launchpad.bin
             build/bootloader/bootloader.bin
