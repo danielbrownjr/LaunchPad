@@ -11,7 +11,7 @@ static lv_obj_t *label_at(lv_obj_t *parent, const char *value, int x, int y,
     lv_label_set_text(label, value);
     lv_obj_set_pos(label, x, y);
     lv_obj_set_width(label, width);
-    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_style_text_color(label, lv_color_hex(color), 0);
     lv_obj_set_style_text_font(label, font, 0);
     return label;
