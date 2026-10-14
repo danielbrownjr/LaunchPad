@@ -1,6 +1,7 @@
 #include "dashboard.h"
 
 #include <stdio.h>
+#include <stdint.h>
 
 #include "board.h"
 
@@ -33,7 +34,15 @@ static lv_obj_t *card_at(lv_obj_t *parent, int x, int y, int width, int height,
     return card;
 }
 
-void lp_dashboard_create(lv_display_t *display, size_t psram_bytes)
+static void touch_test_clicked(lv_event_t *event)
+{
+    static uint32_t count;
+    lv_obj_t *label = lv_event_get_user_data(event);
+    if (count < UINT32_MAX) ++count;
+    lv_label_set_text_fmt(label, "TOUCH OK: %lu", (unsigned long)count);
+}
+
+void lp_dashboard_create(lv_display_t *display, size_t psram_bytes, bool touch_ready)
 {
     lv_obj_t *root = lv_display_get_screen_active(display);
     lv_obj_set_style_bg_color(root, lv_color_hex(0x0B1627), 0);
@@ -50,6 +59,21 @@ void lp_dashboard_create(lv_display_t *display, size_t psram_bytes)
     label_at(clock, "--:--", 20, 52, 245, 0xF4F7FC, &lv_font_montserrat_40);
     label_at(clock, "CLOCK NOT SET", 20, 118, 260, 0xF9BE62, &lv_font_montserrat_20);
     label_at(clock, "No RTC or time sync", 20, 163, 255, 0xAABBCF, &lv_font_montserrat_14);
+
+    lv_obj_t *touch_button = lv_button_create(clock);
+    lv_obj_set_pos(touch_button, 20, 201);
+    lv_obj_set_size(touch_button, 252, 36);
+    lv_obj_set_style_bg_color(touch_button, lv_color_hex(0x246B88), 0);
+    lv_obj_set_style_radius(touch_button, 8, 0);
+    lv_obj_t *touch_label = lv_label_create(touch_button);
+    lv_label_set_text(touch_label, touch_ready ? "TAP TO TEST" : "TOUCH OFFLINE");
+    lv_obj_set_style_text_font(touch_label, &lv_font_montserrat_14, 0);
+    lv_obj_center(touch_label);
+    if (touch_ready) {
+        lv_obj_add_event_cb(touch_button, touch_test_clicked, LV_EVENT_CLICKED, touch_label);
+    } else {
+        lv_obj_add_state(touch_button, LV_STATE_DISABLED);
+    }
 
     lv_obj_t *next = card_at(root, 337, 64, 439, 244, 0x152E46);
     label_at(next, "NEXT STOP / SYNTHETIC DATA", 20, 18, 406, 0x80D7F3, &lv_font_montserrat_14);
@@ -71,11 +95,13 @@ void lp_dashboard_create(lv_display_t *display, size_t psram_bytes)
     char status[120];
     if (psram_bytes > 0) {
         snprintf(status, sizeof(status),
-                 "PSRAM: %u MiB detected   |   P4   |   C5 OFF   |   TOUCH NOT ENABLED",
-                 (unsigned)(psram_bytes / (1024U * 1024U)));
+                 "PSRAM: %u MiB detected   |   P4   |   C5 OFF   |   %s",
+                 (unsigned)(psram_bytes / (1024U * 1024U)),
+                 touch_ready ? "TOUCH I2C READY" : "TOUCH OFFLINE");
     } else {
         snprintf(status, sizeof(status),
-                 "PSRAM: NOT DETECTED   |   P4   |   C5 OFF   |   TOUCH NOT ENABLED");
+                 "PSRAM: NOT DETECTED   |   P4   |   C5 OFF   |   %s",
+                 touch_ready ? "TOUCH I2C READY" : "TOUCH OFFLINE");
     }
     label_at(root, status, 26, 439, 755, 0xA6BBCF, &lv_font_montserrat_14);
 }
