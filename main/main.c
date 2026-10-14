@@ -7,6 +7,8 @@
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "esp_timer.h"
+#include "sd_pwr_ctrl_by_on_chip_ldo.h"
+#include "sd_pwr_ctrl_interface.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lvgl.h"
@@ -15,6 +17,8 @@
 #define LVGL_DRAW_LINES 48
 
 static const char *TAG = "launchpad";
+/* Retained for the whole application lifetime. Do not release while running. */
+static sd_pwr_ctrl_handle_t s_ldo4_handle;
 
 static void lvgl_tick(void *unused)
 {
@@ -47,6 +51,14 @@ static void lvgl_flush(lv_display_t *display, const lv_area_t *area, uint8_t *pi
 
 void app_main(void)
 {
+    /* Vendor-parity experiment only. N16R32X VDDO_4/VDD_IO_5 wiring
+     * and electrical safety MUST be confirmed before this is flashed. */
+    const sd_pwr_ctrl_ldo_config_t ldo4_cfg = {
+        .ldo_chan_id = 4,
+    };
+    ESP_ERROR_CHECK(sd_pwr_ctrl_new_on_chip_ldo(&ldo4_cfg, &s_ldo4_handle));
+    ESP_ERROR_CHECK(sd_pwr_ctrl_set_io_voltage(s_ldo4_handle, 3300));
+
     ESP_ERROR_CHECK(lp_board_prepare());
 
     if (!esp_psram_is_initialized()) {

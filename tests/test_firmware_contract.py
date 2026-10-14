@@ -6,6 +6,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 BOARD = (ROOT / "main/board.c").read_text(encoding="utf-8")
 UI = (ROOT / "main/dashboard.c").read_text(encoding="utf-8")
+MAIN = (ROOT / "main/main.c").read_text(encoding="utf-8")
 CONFIG = (ROOT / "sdkconfig.defaults").read_text(encoding="utf-8")
 MANIFEST = (ROOT / "main/idf_component.yml").read_text(encoding="utf-8")
 
@@ -37,6 +38,17 @@ class BringupGuards(unittest.TestCase):
         self.assertIn('version: "==9.4.0"', MANIFEST)
         self.assertIn('CONFIG_IDF_TARGET="esp32p4"', CONFIG)
         self.assertIn("CONFIG_SPIRAM_MODE_HEX=y", CONFIG)
+
+    def test_ldo4_candidate_precedes_board_and_panel_setup(self):
+        cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertIn("sdmmc", cmake)
+        self.assertIn("static sd_pwr_ctrl_handle_t s_ldo4_handle;", MAIN)
+        self.assertIn(".ldo_chan_id = 4", MAIN)
+        self.assertIn("sd_pwr_ctrl_set_io_voltage(s_ldo4_handle, 3300)", MAIN)
+        self.assertLess(MAIN.index("sd_pwr_ctrl_new_on_chip_ldo("),
+                        MAIN.index("sd_pwr_ctrl_set_io_voltage("))
+        self.assertLess(MAIN.index("sd_pwr_ctrl_set_io_voltage("),
+                        MAIN.index("lp_board_prepare()"))
 
     def test_no_network_or_simpro_stack_linked(self):
         cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
