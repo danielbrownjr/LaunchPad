@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BOARD = (ROOT / "main/board.c").read_text(encoding="utf-8")
 UI = (ROOT / "main/dashboard.c").read_text(encoding="utf-8")
 MAIN = (ROOT / "main/main.c").read_text(encoding="utf-8")
+TOUCH = (ROOT / "main/touch.c").read_text(encoding="utf-8")
 CONFIG = (ROOT / "sdkconfig.defaults").read_text(encoding="utf-8")
 MANIFEST = (ROOT / "main/idf_component.yml").read_text(encoding="utf-8")
 
@@ -31,13 +32,30 @@ class BringupGuards(unittest.TestCase):
         self.assertIn("SYNTHETIC DATA", UI)
         self.assertIn("NOT A REAL APPOINTMENT", UI)
         self.assertIn("C5 OFF", UI)
-        self.assertIn("TOUCH NOT ENABLED", UI)
+        self.assertIn("TOUCH I2C READY", UI)
+        self.assertIn("TOUCH OFFLINE", UI)
+        self.assertIn("TAP TO TEST", UI)
 
     def test_exact_software_baseline(self):
         self.assertIn('version: "==6.0.3"', MANIFEST)
         self.assertIn('version: "==9.4.0"', MANIFEST)
         self.assertIn('CONFIG_IDF_TARGET="esp32p4"', CONFIG)
         self.assertIn("CONFIG_SPIRAM_MODE_HEX=y", CONFIG)
+
+    def test_main_stack_covers_touch_and_dashboard(self):
+        self.assertIn("CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192", CONFIG)
+        self.assertIn("#if CONFIG_ESP_MAIN_TASK_STACK_SIZE < 8192", MAIN)
+        self.assertIn("uxTaskGetStackHighWaterMark(NULL)", MAIN)
+
+    def test_touch_mapping_matches_physical_screen_orientation(self):
+        # A touch at (629,196) wrongly activated the button near (170,283).
+        # The old mirror produced (799-629, 479-196) == (170,283).
+        self.assertEqual((799 - 629, 479 - 196), (170, 283))
+        self.assertIn("data->point.x = (int32_t)raw_x;", TOUCH)
+        self.assertIn("data->point.y = (int32_t)raw_y;", TOUCH)
+        self.assertNotIn("LP_LCD_WIDTH - 1U - raw_x", TOUCH)
+        self.assertNotIn("LP_LCD_HEIGHT - 1U - raw_y", TOUCH)
+        self.assertIn("raw_x < LP_LCD_WIDTH && raw_y < LP_LCD_HEIGHT", TOUCH)
 
     def test_ldo4_candidate_precedes_board_and_panel_setup(self):
         cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
@@ -49,6 +67,23 @@ class BringupGuards(unittest.TestCase):
                         MAIN.index("sd_pwr_ctrl_set_io_voltage("))
         self.assertLess(MAIN.index("sd_pwr_ctrl_set_io_voltage("),
                         MAIN.index("lp_board_prepare()"))
+
+    def test_touch_is_optional_and_wired_to_v13(self):
+        cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertIn('"touch.c"', cmake)
+        self.assertIn("esp_driver_i2c", cmake)
+        for literal in ["GPIO_NUM_14", "GPIO_NUM_15", "GPIO_NUM_0", "GPIO_NUM_1",
+                        "0x5A", "0xD000", "0xD200", "0xAB", "400000"]:
+            self.assertIn(literal, TOUCH)
+        self.assertIn("i2c_master_transmit_receive", TOUCH)
+        self.assertIn("LV_INDEV_STATE_RELEASED", TOUCH)
+        self.assertIn("raw_x < LP_LCD_WIDTH && raw_y < LP_LCD_HEIGHT", TOUCH)
+        self.assertIn("if (err != ESP_OK) goto failed;", TOUCH)
+        self.assertIn("return false;", TOUCH)
+        self.assertIn("lv_indev_set_read_cb", TOUCH)
+        self.assertIn("lv_indev_set_display", TOUCH)
+        self.assertIn("touch_ready = lp_touch_init(display)", MAIN)
+        self.assertIn("touch_test_clicked", UI)
 
     def test_no_network_or_simpro_stack_linked(self):
         cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")

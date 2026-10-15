@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "main.c" "board.c" "dashboard.c"
+    SRCS "main.c" "board.c" "dashboard.c" "touch.c"
     INCLUDE_DIRS "."
-    PRIV_REQUIRES esp_lcd esp_driver_gpio esp_timer esp_psram sdmmc
+    PRIV_REQUIRES esp_lcd esp_driver_gpio esp_timer esp_psram sdmmc esp_driver_i2c
 )
