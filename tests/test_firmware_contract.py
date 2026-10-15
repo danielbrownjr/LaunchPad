@@ -114,6 +114,14 @@ class BringupGuards(unittest.TestCase):
         self.assertIn("LP_NET_UNCONFIGURED", NET_H)
         self.assertIn("lp_dashboard_set_network_state(lp_network_state())", MAIN)
 
+    def test_native_ci_validates_resolved_c5_configuration(self):
+        workflow = (ROOT / ".github/workflows/p4-build.yml").read_text(encoding="utf-8")
+        checker = (ROOT / "tools/check_c5_build.py").read_text(encoding="utf-8")
+        self.assertIn("python3 tools/check_c5_build.py", workflow)
+        self.assertIn("CONFIG_ESP_HOSTED_CP_TARGET_ESP32C5", checker)
+        self.assertIn("CONFIG_ESP_HOSTED_SDIO_GPIO_RESET_SLAVE", checker)
+        self.assertIn("build/launchpad.bin", checker)
+
     def test_no_simpro_data_or_credential_integration(self):
         cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
         self.assertNotRegex(cmake, r"esp_http_client|mqtt")

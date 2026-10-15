@@ -28,6 +28,9 @@ jobs:
           esp_idf_version: v6.0.3
           target: esp32p4
           path: "."
+      - name: Verify resolved C5 SDIO build and partition fit
+        if: success()
+        run: python3 tools/check_c5_build.py
       - name: Show exact dependency resolution
         if: success()
         run: cat dependencies.lock
