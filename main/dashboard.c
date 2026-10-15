@@ -4,8 +4,36 @@
 #include <stdint.h>
 
 #include "board.h"
+#include "clock_util.h"
+#include <time.h>
 
 static lv_obj_t *s_footer;
+static lv_obj_t *s_clock_label;
+static lv_obj_t *s_clock_status;
+static lv_obj_t *s_clock_detail;
+
+void lp_dashboard_update_clock(void)
+{
+    if (!s_clock_label) return;
+    if (!lp_network_clock_valid()) {
+        lv_label_set_text(s_clock_label, "--:--");
+        lv_label_set_text(s_clock_status, "CLOCK NOT SET");
+        lv_label_set_text(s_clock_detail, "Waiting for NTP sync");
+        return;
+    }
+    char formatted[20];
+    if (!lp_clock_format(time(NULL), formatted, sizeof(formatted))) return;
+    lv_label_set_text(s_clock_label, formatted);
+    if (lp_network_clock_stale()) {
+        lv_label_set_text(s_clock_status, "SYNC STALE");
+    } else if (lp_network_state() == LP_NET_SYNCED) {
+        lv_label_set_text(s_clock_status, "TIME SYNCED");
+    } else {
+        lv_label_set_text(s_clock_status, "OFFLINE TIME");
+    }
+    lv_label_set_text(s_clock_detail, "Eastern time (automatic DST)");
+}
+
 static size_t s_psram_bytes;
 static bool s_touch_ready;
 static lp_net_state_t s_net_state = LP_NET_OFF;
@@ -18,7 +46,12 @@ void lp_dashboard_set_network_state(lp_net_state_t state)
     switch (state) {
         case LP_NET_STARTING: net = "C5 STARTING"; break;
         case LP_NET_UNCONFIGURED: net = "WIFI NOT CONFIGURED"; break;
-        case LP_NET_ERROR: net = "C5 LINK ERROR"; break;
+        case LP_NET_CONNECTING: net = "WIFI CONNECTING"; break;
+        case LP_NET_DISCONNECTED: net = "WIFI DISCONNECTED"; break;
+        case LP_NET_IP_READY: net = "DHCP IP OK"; break;
+        case LP_NET_SYNCING: net = "CLOCK SYNCING"; break;
+        case LP_NET_SYNCED: net = "CLOCK SYNCED"; break;
+        case LP_NET_ERROR: net = "NETWORK ERROR"; break;
         default: net = "C5 OFF"; break;
     }
     char status[128];
@@ -86,9 +119,9 @@ void lp_dashboard_create(lv_display_t *display, size_t psram_bytes, bool touch_r
 
     lv_obj_t *clock = card_at(root, 24, 64, 295, 244, 0x14263D);
     label_at(clock, "LOCAL TIME", 20, 18, 250, 0x9FB4CC, &lv_font_montserrat_14);
-    label_at(clock, "--:--", 20, 52, 245, 0xF4F7FC, &lv_font_montserrat_40);
-    label_at(clock, "CLOCK NOT SET", 20, 118, 260, 0xF9BE62, &lv_font_montserrat_20);
-    label_at(clock, "No RTC or time sync", 20, 163, 255, 0xAABBCF, &lv_font_montserrat_14);
+    s_clock_label = label_at(clock, "--:--", 20, 52, 255, 0xF4F7FC, &lv_font_montserrat_40);
+    s_clock_status = label_at(clock, "CLOCK NOT SET", 20, 118, 260, 0xF9BE62, &lv_font_montserrat_20);
+    s_clock_detail = label_at(clock, "Waiting for NTP sync", 20, 163, 255, 0xAABBCF, &lv_font_montserrat_14);
 
     lv_obj_t *touch_button = lv_button_create(clock);
     lv_obj_set_pos(touch_button, 20, 201);

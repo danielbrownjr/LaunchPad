@@ -71,3 +71,7 @@ CONFIG_ESP_HOSTED_SDIO_CHECKSUM=y
 CONFIG_ESP_HOSTED_SLAVE_RESET_ON_EVERY_HOST_BOOTUP=y
 CONFIG_ESP_WIFI_REMOTE_ENABLED=y
 CONFIG_ESP_WIFI_REMOTE_LIBRARY_HOSTED=y
+
+# Build for size: C5/Hosted networking almost filled the original 1 MiB app.
+# No partition table or bootloader flash is permitted in this change.
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
