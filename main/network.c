@@ -108,6 +108,9 @@ static bool queue_action(lp_cmd_kind_t kind, const lp_credentials_t *creds)
     if (s_command.kind == CMD_NONE) {
         if (creds) memcpy(&s_command.credentials, creds, sizeof(*creds));
         s_command.kind = kind;
+        if (kind == CMD_SCAN) atomic_store(&s_scan_status, LP_SCAN_RUNNING);
+        if (kind == CMD_SAVE || kind == CMD_FORGET)
+            atomic_store(&s_save_status, LP_SAVE_PENDING);
         accepted = true;
     }
     portEXIT_CRITICAL(&s_command_lock);
@@ -118,24 +121,18 @@ static bool queue_action(lp_cmd_kind_t kind, const lp_credentials_t *creds)
 bool lp_network_request_scan(void)
 {
     if (lp_network_scan_status() == LP_SCAN_RUNNING) return false;
-    if (!queue_action(CMD_SCAN, NULL)) return false;
-    atomic_store(&s_scan_status, LP_SCAN_RUNNING);
-    return true;
+    return queue_action(CMD_SCAN, NULL);
 }
 
 bool lp_network_submit_credentials(const lp_credentials_t *creds)
 {
     if (!lp_credentials_valid(creds)) return false;
-    if (!queue_action(CMD_SAVE, creds)) return false;
-    atomic_store(&s_save_status, LP_SAVE_PENDING);
-    return true;
+    return queue_action(CMD_SAVE, creds);
 }
 
 bool lp_network_forget_saved(void)
 {
-    if (!queue_action(CMD_FORGET, NULL)) return false;
-    atomic_store(&s_save_status, LP_SAVE_PENDING);
-    return true;
+    return queue_action(CMD_FORGET, NULL);
 }
 
 lp_net_state_t lp_network_state(void)

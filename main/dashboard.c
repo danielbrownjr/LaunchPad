@@ -5,6 +5,7 @@
 
 #include "board.h"
 #include "clock_util.h"
+#include "wifi_ui.h"
 #include <time.h>
 
 static lv_obj_t *s_footer;
@@ -115,7 +116,7 @@ void lp_dashboard_create(lv_display_t *display, size_t psram_bytes, bool touch_r
     lv_obj_remove_flag(root, LV_OBJ_FLAG_SCROLLABLE);
 
     label_at(root, "LAUNCHPAD / BOARD BRING-UP", 26, 17, 530, 0x80D7F3, &lv_font_montserrat_20);
-    label_at(root, "OFFLINE DEMO", 616, 19, 160, 0xF9BE62, &lv_font_montserrat_14);
+    /* Touch Wi-Fi setup replaces the old static demo banner. */
 
     lv_obj_t *clock = card_at(root, 24, 64, 295, 244, 0x14263D);
     label_at(clock, "LOCAL TIME", 20, 18, 250, 0x9FB4CC, &lv_font_montserrat_14);
@@ -161,4 +162,5 @@ void lp_dashboard_create(lv_display_t *display, size_t psram_bytes, bool touch_r
     /* Force first full status render, even though the static label has a stub. */
     s_net_state = LP_NET_ERROR;
     lp_dashboard_set_network_state(LP_NET_OFF);
+    lp_wifi_ui_init(root, touch_ready);
 }

@@ -145,6 +145,32 @@ class BringupGuards(unittest.TestCase):
         self.assertIn("SYNTHETIC DATA", UI)
         self.assertIn("CONFIG_COMPILER_OPTIMIZATION_SIZE=y", CONFIG)
 
+
+    def test_wifi_touch_only_through_network_worker(self):
+        ui = (ROOT / "main/wifi_ui.c").read_text(encoding="utf-8")
+        head = (ROOT / "main/network.h").read_text(encoding="utf-8")
+        cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertIn('"wifi_ui.c"', cmake)
+        self.assertIn("lp_wifi_ui_init(root, touch_ready)", UI)
+        self.assertIn("lp_wifi_ui_tick();", MAIN)
+        self.assertIn("lv_textarea_set_password_mode(s_ui.password, true)", ui)
+        self.assertIn("lv_textarea_set_password_show_time(s_ui.password, 0)", ui)
+        self.assertIn("lv_keyboard_set_textarea(", ui)
+        self.assertIn("lp_network_request_scan()", ui)
+        self.assertIn("lp_network_submit_credentials(&credentials)", ui)
+        self.assertIn("lp_network_forget_saved()", ui)
+        self.assertIn("lp_secure_wipe(&credentials, sizeof(credentials))", ui)
+        self.assertIn("lv_textarea_set_text(s_ui.password, \"\")", ui)
+        self.assertIn("LP_NET_SCAN_MAX 12", head)
+        self.assertIn("esp_wifi_scan_start(&config, true)", NETWORK)
+        self.assertIn("esp_wifi_scan_get_ap_records", NETWORK)
+        self.assertIn("nvs_erase_key", NETWORK)
+        self.assertIn("portENTER_CRITICAL", NETWORK)
+        self.assertIn("NET_ACTION", NETWORK)
+        # No network driver or flash access from the LVGL task.
+        for banned in ("esp_wifi_", "nvs_open(", "nvs_set_blob(", "nvs_erase_key("):
+            self.assertNotIn(banned, ui)
+
     def test_no_simpro_data_or_credential_integration(self):
         cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
         self.assertNotRegex(cmake, r"esp_http_client|mqtt")
