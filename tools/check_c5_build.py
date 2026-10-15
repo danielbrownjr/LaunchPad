@@ -19,6 +19,7 @@ def require(name: str, value: str) -> None:
         raise SystemExit(f"Resolved Kconfig mismatch: {name} expected {value}; found {selected}")
 
 for name in (
+    "CONFIG_COMPILER_OPTIMIZATION_SIZE",
     "CONFIG_IDF_TARGET_ESP32P4",
     "CONFIG_ESP_HOSTED_ENABLED",
     "CONFIG_SLAVE_IDF_TARGET_ESP32C5",

@@ -134,6 +134,7 @@ class BringupGuards(unittest.TestCase):
         self.assertIn("lp_secure_wipe", NETWORK)
         self.assertIn("WIFI_STORAGE_RAM", NETWORK)
         self.assertIn("IP_EVENT_STA_GOT_IP", NETWORK)
+        self.assertIn("IP_EVENT_STA_LOST_IP", NETWORK)
         self.assertIn("WIFI_EVENT_STA_DISCONNECTED", NETWORK)
         self.assertIn("esp_netif_sntp_init", NETWORK)
         self.assertIn("time_sync_cb", NETWORK)

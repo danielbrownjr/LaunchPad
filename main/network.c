@@ -191,6 +191,9 @@ static void event_handler(void *arg, esp_event_base_t base,
     if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         set_state(LP_NET_IP_READY);
         xEventGroupSetBits(s_events, NET_IP);
+    } else if (base == IP_EVENT && id == IP_EVENT_STA_LOST_IP) {
+        set_state(LP_NET_DISCONNECTED);
+        xEventGroupSetBits(s_events, NET_DISCONNECT);
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         set_state(LP_NET_DISCONNECTED);
         xEventGroupSetBits(s_events, NET_DISCONNECT);
@@ -243,6 +246,9 @@ static void network_task(void *arg)
     err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
                                      event_handler, NULL);
     if (err != ESP_OK) { fail("IP event handler", err); goto done; }
+    err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_LOST_IP,
+                                     event_handler, NULL);
+    if (err != ESP_OK) { fail("IP-loss event handler", err); goto done; }
 
     /* GPIO28 is a switched C5 power rail, controlled by ESP-Hosted. */
     ESP_LOGI(TAG, "Starting ESP-Hosted C5 2.12.3, SDIO slot 1");
@@ -308,7 +314,12 @@ static void network_task(void *arg)
                     ESP_LOGI(TAG, "DHCP IP acquired; starting SNTP");
                     set_state(LP_NET_SYNCING);
                     err = sync_start();
-                    if (err != ESP_OK) fail("SNTP start", err);
+                    if (err != ESP_OK) {
+                        fail("SNTP start", err);
+                        (void)esp_wifi_disconnect();
+                        vTaskDelay(pdMS_TO_TICKS(1000));
+                        continue;
+                    }
                     for (;;) {
                         EventBits_t f = xEventGroupWaitBits(
                             s_events, NET_DISCONNECT | NET_NEW_CONFIG,
@@ -326,6 +337,9 @@ static void network_task(void *arg)
                     }
                     continue;
                 }
+                /* The station can associate without obtaining DHCP. Disconnect
+                 * before retrying rather than connecting atop stale state. */
+                (void)esp_wifi_disconnect();
             }
         }
         set_state(LP_NET_DISCONNECTED);
