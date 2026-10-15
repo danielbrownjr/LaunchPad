@@ -6,6 +6,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 BOARD = (ROOT / "main/board.c").read_text(encoding="utf-8")
 UI = (ROOT / "main/dashboard.c").read_text(encoding="utf-8")
+NETWORK = (ROOT / "main/network.c").read_text(encoding="utf-8")
+NET_H = (ROOT / "main/network.h").read_text(encoding="utf-8")
 MAIN = (ROOT / "main/main.c").read_text(encoding="utf-8")
 TOUCH = (ROOT / "main/touch.c").read_text(encoding="utf-8")
 CONFIG = (ROOT / "sdkconfig.defaults").read_text(encoding="utf-8")
@@ -32,6 +34,9 @@ class BringupGuards(unittest.TestCase):
         self.assertIn("SYNTHETIC DATA", UI)
         self.assertIn("NOT A REAL APPOINTMENT", UI)
         self.assertIn("C5 OFF", UI)
+        self.assertIn("C5 STARTING", UI)
+        self.assertIn("WIFI NOT CONFIGURED", UI)
+        self.assertIn("C5 LINK ERROR", UI)
         self.assertIn("TOUCH I2C READY", UI)
         self.assertIn("TOUCH OFFLINE", UI)
         self.assertIn("TAP TO TEST", UI)
@@ -85,9 +90,31 @@ class BringupGuards(unittest.TestCase):
         self.assertIn("touch_ready = lp_touch_init(display)", MAIN)
         self.assertIn("touch_test_clicked", UI)
 
-    def test_no_network_or_simpro_stack_linked(self):
+    def test_c5_transport_is_board_specific_and_pinned(self):
         cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
-        self.assertNotRegex(cmake, r"esp_wifi|esp_hosted|esp_http_client|mqtt")
+        self.assertIn("==2.12.3", MANIFEST)
+        self.assertIn("==1.6.1", MANIFEST)
+        self.assertIn("CONFIG_ESP_HOSTED_CP_TARGET_ESP32C5=y", CONFIG)
+        self.assertNotIn("CONFIG_ESP_HOSTED_CP_TARGET_ESP32C61=y", CONFIG)
+        self.assertIn("CONFIG_ESP_HOSTED_SDIO_4_BIT_BUS=y", CONFIG)
+        self.assertIn("CONFIG_ESP_HOSTED_SDIO_CHECKSUM=y", CONFIG)
+        for gpio in ["28", "31", "32", "33", "34", "30", "29"]:
+            self.assertRegex(CONFIG, rf"CONFIG_ESP_HOSTED_SDIO_(?:GPIO_RESET_SLAVE|PIN_[A-Z0-9]+)={gpio}\\b")
+        self.assertIn("network.c", cmake)
+        self.assertIn("esp_wifi", cmake)
+        self.assertIn("lp_network_start()", MAIN)
+        self.assertLess(MAIN.index("lp_board_backlight_on()"), MAIN.index("lp_network_start()"))
+        self.assertIn("xTaskCreate(", NETWORK)
+        self.assertIn("esp_hosted_init()", NETWORK)
+        self.assertIn("esp_wifi_start()", NETWORK)
+        self.assertNotIn("esp_wifi_connect()", NETWORK)
+        self.assertNotIn("WIFI_SSID", NETWORK)
+        self.assertIn("LP_NET_UNCONFIGURED", NET_H)
+        self.assertIn("lp_dashboard_set_network_state(lp_network_state())", MAIN)
+
+    def test_no_simpro_data_or_credential_integration(self):
+        cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertNotRegex(cmake, r"esp_http_client|mqtt")
         self.assertNotIn("simpro", UI.lower())
 
 

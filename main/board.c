@@ -13,7 +13,8 @@ static const char *TAG = "lp_board";
 
 esp_err_t lp_board_prepare(void)
 {
-    /* Do not power the C5: no ESP-Hosted, SDIO or Wi-Fi in this slice. */
+    /* Hold the C5 power switch OFF until ESP-Hosted controls its reset/power cycle.
+     * GPIO28 is a load-switch enable, not the C5 EN pin. */
     const gpio_config_t control = {
         .pin_bit_mask = (1ULL << LP_LCD_BL_GPIO) |
                         (1ULL << LP_C5_ENABLE_GPIO) |
