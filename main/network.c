@@ -556,7 +556,7 @@ static void network_task(void *arg)
         EventBits_t wait = xEventGroupWaitBits(s_events,
             NET_NEW_CONFIG | NET_ACTION, pdTRUE,
             pdFALSE, pdMS_TO_TICKS(pause * 1000U));
-        if (wait & NET_ACTION) (void)process_action();
+        if ((wait & NET_ACTION) && process_action()) attempts = 0;
     }
 
 done:

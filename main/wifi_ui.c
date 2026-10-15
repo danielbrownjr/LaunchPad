@@ -17,6 +17,8 @@ typedef struct {
     lv_obj_t *ap_list;
     lv_obj_t *message;
     lv_obj_t *saved;
+    lv_obj_t *network_status;
+    lv_obj_t *form_feedback;
     lv_obj_t *ssid;
     lv_obj_t *password;
     lv_obj_t *keyboard;
@@ -86,6 +88,8 @@ static void focus_field(lv_event_t *event)
 
 static void enter_form(const char *network_name)
 {
+    s_ui.forget_confirm = false;
+    lv_label_set_text(s_ui.form_feedback, "");
     lv_textarea_set_text(s_ui.ssid, network_name ? network_name : "");
     lv_textarea_set_text(s_ui.password, "");
     lv_keyboard_set_textarea(s_ui.keyboard,
@@ -137,13 +141,12 @@ static void save_pressed(lv_event_t *event)
         valid = lp_credentials_valid(&credentials);
     }
     if (!valid) {
-        lv_label_set_text(s_ui.message, "SSID 1-32 bytes, password 8-63 bytes required.");
-        lv_obj_add_flag(s_ui.form_page, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_remove_flag(s_ui.list_page, LV_OBJ_FLAG_HIDDEN);
-    } else if (!lp_network_submit_credentials(&credentials)) {
-        lv_label_set_text(s_ui.message, "Wi-Fi busy; try Connect again.");
+        lv_label_set_text(s_ui.form_feedback, "Check SSID and password length.");
         lp_secure_wipe(&credentials, sizeof(credentials));
-        lv_textarea_set_text(s_ui.password, "");
+        return;
+    } else if (!lp_network_submit_credentials(&credentials)) {
+        lv_label_set_text(s_ui.form_feedback, "Wi-Fi busy, retry shortly.");
+        lp_secure_wipe(&credentials, sizeof(credentials));
         return;
     } else {
         lv_label_set_text(s_ui.message, "Saving network to P4, then connecting...");
@@ -213,7 +216,8 @@ static void create_panel(lv_obj_t *root)
     lv_obj_set_style_radius(s_ui.panel, 14, 0);
     lv_obj_set_style_pad_all(s_ui.panel, 4, 0);
     lv_obj_remove_flag(s_ui.panel, LV_OBJ_FLAG_SCROLLABLE);
-    label(s_ui.panel, "Wi-Fi settings", 14, 8, 530);
+    label(s_ui.panel, "Wi-Fi settings", 14, 8, 190);
+    s_ui.network_status = label(s_ui.panel, "Starting...", 211, 8, 415);
     button(s_ui.panel, "Close", 648, 4, 94, 38, close_setup);
 
     s_ui.list_page = lv_obj_create(s_ui.panel);
@@ -254,6 +258,7 @@ static void create_panel(lv_obj_t *root)
     lv_textarea_set_password_mode(s_ui.password, true);
     lv_textarea_set_password_show_time(s_ui.password, 0);
     button(s_ui.form_page, "Back", 12, 107, 144, 42, back_to_scan);
+    s_ui.form_feedback = label(s_ui.form_page, "", 169, 119, 298);
     button(s_ui.form_page, "Save & connect", 483, 107, 196, 42, save_pressed);
     s_ui.keyboard = lv_keyboard_create(s_ui.form_page);
     lv_obj_set_pos(s_ui.keyboard, 12, 156);
@@ -286,6 +291,18 @@ void lp_wifi_ui_init(lv_obj_t *root, bool touch_ready)
 void lp_wifi_ui_tick(void)
 {
     if (!s_ui.panel || lv_obj_has_flag(s_ui.panel, LV_OBJ_FLAG_HIDDEN)) return;
+    const char *net = "C5 starting";
+    switch (lp_network_state()) {
+        case LP_NET_UNCONFIGURED: net = "Not configured"; break;
+        case LP_NET_CONNECTING: net = "Connecting..."; break;
+        case LP_NET_DISCONNECTED: net = "Disconnected"; break;
+        case LP_NET_IP_READY: net = "Connected, IP acquired"; break;
+        case LP_NET_SYNCING: net = "Connected, synchronizing time"; break;
+        case LP_NET_SYNCED: net = "Connected, clock synced"; break;
+        case LP_NET_ERROR: net = "Network error"; break;
+        default: break;
+    }
+    lv_label_set_text(s_ui.network_status, net);
     char saved[LP_SSID_MAX + 1] = {0};
     lp_network_saved_ssid(saved, sizeof(saved));
     char line[72];
