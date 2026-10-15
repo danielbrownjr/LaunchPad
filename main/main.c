@@ -129,8 +129,14 @@ void app_main(void)
     lp_dashboard_set_network_state(lp_network_state());
 
     /* Single-owner LVGL loop; there is no competing UI task. */
+    int64_t last_clock_second = -1;
     while (true) {
         lp_dashboard_set_network_state(lp_network_state());
+        int64_t second = esp_timer_get_time() / 1000000;
+        if (second != last_clock_second) {
+            last_clock_second = second;
+            lp_dashboard_update_clock();
+        }
         uint32_t wait_ms = lv_timer_handler();
         if (wait_ms < 10) wait_ms = 10;
         if (wait_ms > 100) wait_ms = 100;
