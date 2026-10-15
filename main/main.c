@@ -8,6 +8,7 @@
 #include "esp_psram.h"
 #include "esp_timer.h"
 #include "touch.h"
+#include "network.h"
 #include "sd_pwr_ctrl_by_on_chip_ldo.h"
 #include "sd_pwr_ctrl_interface.h"
 #include "freertos/FreeRTOS.h"
@@ -116,11 +117,20 @@ void app_main(void)
              (unsigned)uxTaskGetStackHighWaterMark(NULL));
     (void)lv_timer_handler();  /* Paint the initial frame before enabling backlight. */
     ESP_ERROR_CHECK(lp_board_backlight_on());
-    ESP_LOGI(TAG, "Offline dashboard running; touch %s; C5/network/clock disabled",
+    ESP_LOGI(TAG, "Dashboard running; touch %s; clock unsynchronized",
              touch_ready ? "ready" : "offline");
+
+    /* Hosted transport and remote Wi-Fi can block if the C5 firmware differs.
+     * Start only after the first frame is visible and never on the LVGL task. */
+    const esp_err_t net_err = lp_network_start();
+    if (net_err != ESP_OK) {
+        ESP_LOGE(TAG, "C5 network worker creation failed: %s", esp_err_to_name(net_err));
+    }
+    lp_dashboard_set_network_state(lp_network_state());
 
     /* Single-owner LVGL loop; there is no competing UI task. */
     while (true) {
+        lp_dashboard_set_network_state(lp_network_state());
         uint32_t wait_ms = lv_timer_handler();
         if (wait_ms < 10) wait_ms = 10;
         if (wait_ms > 100) wait_ms = 100;

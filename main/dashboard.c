@@ -5,6 +5,36 @@
 
 #include "board.h"
 
+static lv_obj_t *s_footer;
+static size_t s_psram_bytes;
+static bool s_touch_ready;
+static lp_net_state_t s_net_state = LP_NET_OFF;
+
+void lp_dashboard_set_network_state(lp_net_state_t state)
+{
+    if (s_footer == NULL || state == s_net_state) return;
+    s_net_state = state;
+    const char *net;
+    switch (state) {
+        case LP_NET_STARTING: net = "C5 STARTING"; break;
+        case LP_NET_UNCONFIGURED: net = "WIFI NOT CONFIGURED"; break;
+        case LP_NET_ERROR: net = "C5 LINK ERROR"; break;
+        default: net = "C5 OFF"; break;
+    }
+    char status[128];
+    if (s_psram_bytes > 0) {
+        snprintf(status, sizeof(status),
+                 "PSRAM: %u MiB detected   |   P4   |   %s   |   %s",
+                 (unsigned)(s_psram_bytes / (1024U * 1024U)), net,
+                 s_touch_ready ? "TOUCH I2C READY" : "TOUCH OFFLINE");
+    } else {
+        snprintf(status, sizeof(status),
+                 "PSRAM: NOT DETECTED   |   P4   |   %s   |   %s",
+                 net, s_touch_ready ? "TOUCH I2C READY" : "TOUCH OFFLINE");
+    }
+    lv_label_set_text(s_footer, status);
+}
+
 static lv_obj_t *label_at(lv_obj_t *parent, const char *value, int x, int y,
                            int width, uint32_t color, const lv_font_t *font)
 {
@@ -92,16 +122,10 @@ void lp_dashboard_create(lv_display_t *display, size_t psram_bytes, bool touch_r
         lv_obj_set_style_radius(swatch, 3, 0);
     }
 
-    char status[120];
-    if (psram_bytes > 0) {
-        snprintf(status, sizeof(status),
-                 "PSRAM: %u MiB detected   |   P4   |   C5 OFF   |   %s",
-                 (unsigned)(psram_bytes / (1024U * 1024U)),
-                 touch_ready ? "TOUCH I2C READY" : "TOUCH OFFLINE");
-    } else {
-        snprintf(status, sizeof(status),
-                 "PSRAM: NOT DETECTED   |   P4   |   C5 OFF   |   %s",
-                 touch_ready ? "TOUCH I2C READY" : "TOUCH OFFLINE");
-    }
-    label_at(root, status, 26, 439, 755, 0xA6BBCF, &lv_font_montserrat_14);
+    s_psram_bytes = psram_bytes;
+    s_touch_ready = touch_ready;
+    s_footer = label_at(root, "C5 OFF", 26, 439, 755, 0xA6BBCF, &lv_font_montserrat_14);
+    /* Force first full status render, even though the static label has a stub. */
+    s_net_state = LP_NET_ERROR;
+    lp_dashboard_set_network_state(LP_NET_OFF);
 }
