@@ -14,6 +14,10 @@
 #include "freertos/task.h"
 #include "lvgl.h"
 
+#if CONFIG_ESP_MAIN_TASK_STACK_SIZE < 8192
+#error "LaunchPad UI main task requires at least 8 KiB stack"
+#endif
+
 #define LVGL_TICK_MS 2
 #define LVGL_DRAW_LINES 48
 
@@ -108,6 +112,8 @@ void app_main(void)
 
     const bool touch_ready = lp_touch_init(display);
     lp_dashboard_create(display, psram, touch_ready);
+    ESP_LOGI(TAG, "main stack minimum free after dashboard: %u bytes",
+             (unsigned)uxTaskGetStackHighWaterMark(NULL));
     (void)lv_timer_handler();  /* Paint the initial frame before enabling backlight. */
     ESP_ERROR_CHECK(lp_board_backlight_on());
     ESP_LOGI(TAG, "Offline dashboard running; touch %s; C5/network/clock disabled",

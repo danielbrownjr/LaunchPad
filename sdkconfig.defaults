@@ -21,6 +21,11 @@ CONFIG_ESP_LDO_VOLTAGE_PSRAM_1800_MV=y
 # J10 is our only USB serial/JTAG debug interface; no UART adapter required.
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 
+# LVGL dashboard + CST3240 I2C input exhausted the default 4 KiB main task
+# stack on hardware (reproducible stack protection fault, 2026-10-15).
+# Keep this explicit and confirm runtime headroom before reducing it.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
 # LVGL 9.4.0 from an exact version constraint in main/idf_component.yml.
 CONFIG_LV_CONF_SKIP=y
 CONFIG_LV_COLOR_DEPTH_16=y

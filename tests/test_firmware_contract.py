@@ -42,6 +42,11 @@ class BringupGuards(unittest.TestCase):
         self.assertIn('CONFIG_IDF_TARGET="esp32p4"', CONFIG)
         self.assertIn("CONFIG_SPIRAM_MODE_HEX=y", CONFIG)
 
+    def test_main_stack_covers_touch_and_dashboard(self):
+        self.assertIn("CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192", CONFIG)
+        self.assertIn("#if CONFIG_ESP_MAIN_TASK_STACK_SIZE < 8192", MAIN)
+        self.assertIn("uxTaskGetStackHighWaterMark(NULL)", MAIN)
+
     def test_ldo4_candidate_precedes_board_and_panel_setup(self):
         cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
         self.assertIn("sdmmc", cmake)
