@@ -47,6 +47,16 @@ class BringupGuards(unittest.TestCase):
         self.assertIn("#if CONFIG_ESP_MAIN_TASK_STACK_SIZE < 8192", MAIN)
         self.assertIn("uxTaskGetStackHighWaterMark(NULL)", MAIN)
 
+    def test_touch_mapping_matches_physical_screen_orientation(self):
+        # A touch at (629,196) wrongly activated the button near (170,283).
+        # The old mirror produced (799-629, 479-196) == (170,283).
+        self.assertEqual((799 - 629, 479 - 196), (170, 283))
+        self.assertIn("data->point.x = (int32_t)raw_x;", TOUCH)
+        self.assertIn("data->point.y = (int32_t)raw_y;", TOUCH)
+        self.assertNotIn("LP_LCD_WIDTH - 1U - raw_x", TOUCH)
+        self.assertNotIn("LP_LCD_HEIGHT - 1U - raw_y", TOUCH)
+        self.assertIn("raw_x < LP_LCD_WIDTH && raw_y < LP_LCD_HEIGHT", TOUCH)
+
     def test_ldo4_candidate_precedes_board_and_panel_setup(self):
         cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
         self.assertIn("sdmmc", cmake)

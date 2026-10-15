@@ -74,11 +74,13 @@ static void touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data)
 
     const uint16_t raw_x = ((uint16_t)report[1] << 4) | ((report[3] >> 4) & 0x0F);
     const uint16_t raw_y = ((uint16_t)report[2] << 4) | (report[3] & 0x0F);
-    /* Vendor's landscape orientation mirrors both coordinates.
-     * The right/bottom boundary is exclusive in LVGL. */
+    /* Physical screen test (2026-10-15): a tap near (629,196) activated
+     * the button drawn near (170,283) with both axes inverted. The panel's
+     * raw coordinates already match the displayed orientation on this board.
+     * Keep the bounds check, but do not apply the vendor's 180-degree mirror. */
     if (raw_x < LP_LCD_WIDTH && raw_y < LP_LCD_HEIGHT) {
-        data->point.x = (int32_t)(LP_LCD_WIDTH - 1U - raw_x);
-        data->point.y = (int32_t)(LP_LCD_HEIGHT - 1U - raw_y);
+        data->point.x = (int32_t)raw_x;
+        data->point.y = (int32_t)raw_y;
         data->state = LV_INDEV_STATE_PRESSED;
     }
 
