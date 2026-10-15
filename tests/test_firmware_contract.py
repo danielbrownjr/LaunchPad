@@ -98,8 +98,10 @@ class BringupGuards(unittest.TestCase):
         self.assertNotIn("CONFIG_ESP_HOSTED_CP_TARGET_ESP32C61=y", CONFIG)
         self.assertIn("CONFIG_ESP_HOSTED_SDIO_4_BIT_BUS=y", CONFIG)
         self.assertIn("CONFIG_ESP_HOSTED_SDIO_CHECKSUM=y", CONFIG)
-        for gpio in ["28", "31", "32", "33", "34", "30", "29"]:
-            self.assertRegex(CONFIG, rf"CONFIG_ESP_HOSTED_SDIO_(?:GPIO_RESET_SLAVE|PIN_[A-Z0-9]+)={gpio}\\b")
+        pins = {"GPIO_RESET_SLAVE": 28, "PIN_CMD": 31, "PIN_CLK": 32,
+                "PIN_D0": 33, "PIN_D1": 34, "PIN_D2": 30, "PIN_D3": 29}
+        for key, gpio in pins.items():
+            self.assertIn(f"CONFIG_ESP_HOSTED_SDIO_{key}={gpio}\\n", CONFIG)
         self.assertIn("network.c", cmake)
         self.assertIn("esp_wifi", cmake)
         self.assertIn("lp_network_start()", MAIN)
