@@ -13,11 +13,15 @@ if not header.is_file() or not image.is_file():
 config = header.read_text(encoding="utf-8")
 def require(name: str, value: str) -> None:
     if re.search(rf"^#define {re.escape(name)} {re.escape(value)}$", config, re.M) is None:
-        raise SystemExit(f"Resolved Kconfig mismatch: {name} expected {value}")
+        selected = [line for line in config.splitlines() if
+                    line.startswith("#define CONFIG_SLAVE_IDF_TARGET_") or
+                    line.startswith("#define CONFIG_ESP_HOSTED_CP_TARGET_")]
+        raise SystemExit(f"Resolved Kconfig mismatch: {name} expected {value}; found {selected}")
 
 for name in (
     "CONFIG_IDF_TARGET_ESP32P4",
     "CONFIG_ESP_HOSTED_ENABLED",
+    "CONFIG_SLAVE_IDF_TARGET_ESP32C5",
     "CONFIG_ESP_HOSTED_CP_TARGET_ESP32C5",
     "CONFIG_ESP_HOSTED_SDIO_HOST_INTERFACE",
     "CONFIG_ESP_HOSTED_SDIO_RESET_ACTIVE_HIGH",

@@ -40,6 +40,7 @@ CONFIG_LV_BUILD_DEMOS=n
 # Host and factory co-processor must agree on ESP-Hosted 2.12.3 and checksum.
 # C5 firmware on THIS unit has not been identified. Never auto-flash the C5.
 CONFIG_ESP_HOSTED_ENABLED=y
+CONFIG_SLAVE_IDF_TARGET_ESP32C5=y
 CONFIG_ESP_HOSTED_CP_TARGET_ESP32C5=y
 CONFIG_ESP_HOSTED_IDF_SLAVE_TARGET="esp32c5"
 CONFIG_ESP_HOSTED_SDIO_HOST_INTERFACE=y
