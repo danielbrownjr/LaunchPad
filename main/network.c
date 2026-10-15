@@ -8,6 +8,8 @@
 #include "clock_util.h"
 
 #include <stdatomic.h>
+#include <stdbool.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +24,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "freertos/portmacro.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 
@@ -30,6 +33,7 @@ extern void esp_hosted_init(void);
 #define NET_IP          BIT0
 #define NET_DISCONNECT  BIT1
 #define NET_NEW_CONFIG  BIT2
+#define NET_ACTION      BIT3
 #define WIFI_NS         "lpwifi"
 #define WIFI_KEY        "sta"
 
@@ -39,6 +43,100 @@ static atomic_int s_state = ATOMIC_VAR_INIT(LP_NET_OFF);
 static atomic_bool s_synced = ATOMIC_VAR_INIT(false);
 static atomic_uint s_last_sync_tick = ATOMIC_VAR_INIT(0);
 static bool s_sntp_started;
+
+typedef enum { CMD_NONE, CMD_SCAN, CMD_SAVE, CMD_FORGET } lp_cmd_kind_t;
+typedef struct {
+    lp_cmd_kind_t kind;
+    lp_credentials_t credentials;
+} lp_net_command_t;
+
+/* Data shared with LVGL is guarded by a short critical section.
+ * Network RPC, flash I/O and scans run ONLY on network_task. */
+static portMUX_TYPE s_command_lock = portMUX_INITIALIZER_UNLOCKED;
+static lp_net_command_t s_command;
+static lp_net_scan_t s_scan;
+static char s_saved_ssid[LP_SSID_MAX + 1];
+static atomic_bool s_wifi_ready = ATOMIC_VAR_INIT(false);
+static atomic_int s_scan_status = ATOMIC_VAR_INIT(LP_SCAN_IDLE);
+static atomic_int s_save_status = ATOMIC_VAR_INIT(LP_SAVE_IDLE);
+
+lp_net_scan_status_t lp_network_scan_status(void)
+{
+    return (lp_net_scan_status_t)atomic_load(&s_scan_status);
+}
+
+lp_net_save_status_t lp_network_save_status(void)
+{
+    return (lp_net_save_status_t)atomic_load(&s_save_status);
+}
+
+void lp_network_scan_copy(lp_net_scan_t *out)
+{
+    if (!out) return;
+    portENTER_CRITICAL(&s_command_lock);
+    *out = s_scan;
+    portEXIT_CRITICAL(&s_command_lock);
+}
+
+void lp_network_saved_ssid(char *out, size_t len)
+{
+    if (!out || !len) return;
+    portENTER_CRITICAL(&s_command_lock);
+    size_t n = strnlen(s_saved_ssid, sizeof(s_saved_ssid));
+    if (n >= len) n = len - 1;
+    memcpy(out, s_saved_ssid, n);
+    out[n] = '\0';
+    portEXIT_CRITICAL(&s_command_lock);
+}
+
+static void update_saved_ssid(const char *ssid)
+{
+    portENTER_CRITICAL(&s_command_lock);
+    memset(s_saved_ssid, 0, sizeof(s_saved_ssid));
+    if (ssid) {
+        size_t n = strnlen(ssid, LP_SSID_MAX);
+        memcpy(s_saved_ssid, ssid, n);
+    }
+    portEXIT_CRITICAL(&s_command_lock);
+}
+
+static bool queue_action(lp_cmd_kind_t kind, const lp_credentials_t *creds)
+{
+    if (!atomic_load(&s_wifi_ready) || !s_events) return false;
+    bool accepted = false;
+    portENTER_CRITICAL(&s_command_lock);
+    if (s_command.kind == CMD_NONE) {
+        if (creds) memcpy(&s_command.credentials, creds, sizeof(*creds));
+        s_command.kind = kind;
+        accepted = true;
+    }
+    portEXIT_CRITICAL(&s_command_lock);
+    if (accepted) xEventGroupSetBits(s_events, NET_ACTION);
+    return accepted;
+}
+
+bool lp_network_request_scan(void)
+{
+    if (lp_network_scan_status() == LP_SCAN_RUNNING) return false;
+    if (!queue_action(CMD_SCAN, NULL)) return false;
+    atomic_store(&s_scan_status, LP_SCAN_RUNNING);
+    return true;
+}
+
+bool lp_network_submit_credentials(const lp_credentials_t *creds)
+{
+    if (!lp_credentials_valid(creds)) return false;
+    if (!queue_action(CMD_SAVE, creds)) return false;
+    atomic_store(&s_save_status, LP_SAVE_PENDING);
+    return true;
+}
+
+bool lp_network_forget_saved(void)
+{
+    if (!queue_action(CMD_FORGET, NULL)) return false;
+    atomic_store(&s_save_status, LP_SAVE_PENDING);
+    return true;
+}
 
 lp_net_state_t lp_network_state(void)
 {
@@ -155,13 +253,9 @@ static void serial_task(void *arg)
         bool pass_ok = serial_line(creds.passphrase, sizeof(creds.passphrase));
 
         if (ssid_ok && pass_ok && lp_credentials_valid(&creds)) {
-            esp_err_t err = save_credentials(&creds);
-            if (err == ESP_OK) {
-                puts("Saved to P4 NVS; connecting.");
-                xEventGroupSetBits(s_events, NET_NEW_CONFIG);
-            } else {
-                ESP_LOGE(TAG, "Credential NVS write failed: %s", esp_err_to_name(err));
-            }
+            puts(lp_network_submit_credentials(&creds)
+                     ? "Wi-Fi update queued; connecting when saved."
+                     : "Wi-Fi is busy; retry.");
         } else {
             puts("Invalid credentials; nothing saved.");
         }
@@ -224,6 +318,107 @@ static esp_err_t sync_start(void)
     return esp_netif_sntp_start();
 }
 
+
+static bool personal_wpa(wifi_auth_mode_t auth)
+{
+    switch (auth) {
+        case WIFI_AUTH_WPA_PSK:
+        case WIFI_AUTH_WPA2_PSK:
+        case WIFI_AUTH_WPA_WPA2_PSK:
+        case WIFI_AUTH_WPA3_PSK:
+        case WIFI_AUTH_WPA2_WPA3_PSK:
+            return true;
+        default:
+            return false;
+    }
+}
+
+/* Blocking driver call is confined to the C5 network worker, not LVGL. */
+static void perform_scan(void)
+{
+    wifi_scan_config_t config = { .show_hidden = false };
+    esp_err_t err = esp_wifi_scan_start(&config, true);
+    lp_net_scan_t results = {0};
+    if (err == ESP_OK) {
+        wifi_ap_record_t records[LP_NET_SCAN_MAX] = {0};
+        uint16_t count = LP_NET_SCAN_MAX;
+        err = esp_wifi_scan_get_ap_records(&count, records);
+        if (err == ESP_OK) {
+            for (uint16_t i = 0; i < count; ++i) {
+                size_t n = strnlen((const char *)records[i].ssid, LP_SSID_MAX);
+                if (n == 0) continue; /* No actionable SSID. */
+                bool duplicate = false;
+                for (size_t j = 0; j < results.count; ++j) {
+                    if (strlen(results.aps[j].ssid) == n &&
+                        memcmp(results.aps[j].ssid, records[i].ssid, n) == 0) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (duplicate) continue;
+                lp_net_ap_t *ap = &results.aps[results.count++];
+                memcpy(ap->ssid, records[i].ssid, n);
+                ap->ssid[n] = '\0';
+                ap->rssi = records[i].rssi;
+                ap->personal_wpa = personal_wpa(records[i].authmode);
+            }
+        } else {
+            (void)esp_wifi_clear_ap_list();
+        }
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Wi-Fi scan failed: %s", esp_err_to_name(err));
+    }
+    portENTER_CRITICAL(&s_command_lock);
+    s_scan = results;
+    portEXIT_CRITICAL(&s_command_lock);
+    atomic_store(&s_scan_status, err == ESP_OK ? LP_SCAN_READY : LP_SCAN_FAILED);
+}
+
+/* Return true when credentials changed, requiring a fresh network attempt. */
+static bool process_action(void)
+{
+    lp_net_command_t request = {0};
+    portENTER_CRITICAL(&s_command_lock);
+    request = s_command;
+    lp_secure_wipe(&s_command, sizeof(s_command));
+    portEXIT_CRITICAL(&s_command_lock);
+
+    bool changed = false;
+    if (request.kind == CMD_SCAN) {
+        perform_scan();
+    } else if (request.kind == CMD_SAVE) {
+        esp_err_t err = save_credentials(&request.credentials);
+        if (err == ESP_OK) {
+            update_saved_ssid(request.credentials.ssid);
+            atomic_store(&s_save_status, LP_SAVE_OK);
+            changed = true;
+        } else {
+            ESP_LOGE(TAG, "Failed saving Wi-Fi settings: %s", esp_err_to_name(err));
+            atomic_store(&s_save_status, LP_SAVE_FAILED);
+        }
+    } else if (request.kind == CMD_FORGET) {
+        nvs_handle_t h;
+        esp_err_t err = nvs_open(WIFI_NS, NVS_READWRITE, &h);
+        if (err == ESP_OK) {
+            err = nvs_erase_key(h, WIFI_KEY);
+            if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+            if (err == ESP_OK) err = nvs_commit(h);
+            nvs_close(h);
+        }
+        if (err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND) {
+            update_saved_ssid(NULL);
+            atomic_store(&s_save_status, LP_SAVE_FORGOTTEN);
+            changed = true;
+        } else {
+            ESP_LOGE(TAG, "Failed forgetting Wi-Fi: %s", esp_err_to_name(err));
+            atomic_store(&s_save_status, LP_SAVE_FAILED);
+        }
+    }
+    lp_secure_wipe(&request, sizeof(request));
+    return changed;
+}
+
 static void network_task(void *arg)
 {
     (void)arg;
@@ -265,6 +460,7 @@ static void network_task(void *arg)
     if (err != ESP_OK) { fail("remote station mode", err); goto done; }
     err = esp_wifi_start();
     if (err != ESP_OK) { fail("remote station start", err); goto done; }
+    atomic_store(&s_wifi_ready, true);
 
     if (xTaskCreate(serial_task, "lp_wifi_setup", 4096, NULL, 3, NULL) != pdPASS) {
         fail("serial provisioning task", ESP_ERR_NO_MEM);
@@ -273,6 +469,7 @@ static void network_task(void *arg)
 
     unsigned attempts = 0;
     for (;;) {
+        xEventGroupClearBits(s_events, NET_NEW_CONFIG);
         lp_credentials_t creds;
         bool found = false;
         err = load_credentials(&creds, &found);
@@ -282,11 +479,14 @@ static void network_task(void *arg)
             vTaskDelay(pdMS_TO_TICKS(5000));
             continue;
         }
+        if (found) update_saved_ssid(creds.ssid);
         if (!found) {
+            update_saved_ssid(NULL);
             set_state(LP_NET_UNCONFIGURED);
-            ESP_LOGI(TAG, "No configured Wi-Fi; waiting for serial 'wifi'");
-            xEventGroupWaitBits(s_events, NET_NEW_CONFIG, pdTRUE,
-                                pdFALSE, portMAX_DELAY);
+            ESP_LOGI(TAG, "No saved Wi-Fi; waiting for touchscreen/serial setup");
+            EventBits_t f = xEventGroupWaitBits(s_events,
+                NET_ACTION | NET_NEW_CONFIG, pdTRUE, pdFALSE, portMAX_DELAY);
+            if (f & NET_ACTION) (void)process_action();
             continue;
         }
 
@@ -302,8 +502,13 @@ static void network_task(void *arg)
                 fail("Wi-Fi connect RPC", err);
             } else {
                 EventBits_t flags = xEventGroupWaitBits(
-                    s_events, NET_IP | NET_DISCONNECT | NET_NEW_CONFIG,
+                    s_events, NET_IP | NET_DISCONNECT | NET_NEW_CONFIG | NET_ACTION,
                     pdTRUE, pdFALSE, pdMS_TO_TICKS(20000));
+                if ((flags & NET_ACTION) && process_action()) {
+                    (void)esp_wifi_disconnect();
+                    attempts = 0;
+                    continue;
+                }
                 if (flags & NET_NEW_CONFIG) {
                     (void)esp_wifi_disconnect();
                     attempts = 0;
@@ -322,8 +527,13 @@ static void network_task(void *arg)
                     }
                     for (;;) {
                         EventBits_t f = xEventGroupWaitBits(
-                            s_events, NET_DISCONNECT | NET_NEW_CONFIG,
+                            s_events, NET_DISCONNECT | NET_NEW_CONFIG | NET_ACTION,
                             pdTRUE, pdFALSE, pdMS_TO_TICKS(5000));
+                        if ((f & NET_ACTION) && process_action()) {
+                            (void)esp_wifi_disconnect();
+                            attempts = 0;
+                            break;
+                        }
                         if (f & NET_NEW_CONFIG) {
                             (void)esp_wifi_disconnect();
                             attempts = 0;
@@ -346,8 +556,10 @@ static void network_task(void *arg)
         unsigned pause = 1U << (attempts < 5U ? attempts : 5U);
         if (attempts < 5U) ++attempts;
         ESP_LOGW(TAG, "Wi-Fi unavailable, retrying in %u seconds", pause);
-        (void)xEventGroupWaitBits(s_events, NET_NEW_CONFIG, pdTRUE,
-                                  pdFALSE, pdMS_TO_TICKS(pause * 1000U));
+        EventBits_t wait = xEventGroupWaitBits(s_events,
+            NET_NEW_CONFIG | NET_ACTION, pdTRUE,
+            pdFALSE, pdMS_TO_TICKS(pause * 1000U));
+        if (wait & NET_ACTION) (void)process_action();
     }
 
 done:
