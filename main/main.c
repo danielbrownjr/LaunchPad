@@ -8,6 +8,7 @@
 #include "esp_psram.h"
 #include "esp_timer.h"
 #include "touch.h"
+#include "wifi_ui.h"
 #include "network.h"
 #include "sd_pwr_ctrl_by_on_chip_ldo.h"
 #include "sd_pwr_ctrl_interface.h"
@@ -136,6 +137,7 @@ void app_main(void)
         if (second != last_clock_second) {
             last_clock_second = second;
             lp_dashboard_update_clock();
+            lp_wifi_ui_tick();
         }
         uint32_t wait_ms = lv_timer_handler();
         if (wait_ms < 10) wait_ms = 10;
