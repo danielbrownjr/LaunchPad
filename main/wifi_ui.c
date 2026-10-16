@@ -288,8 +288,10 @@ static void create_panel(lv_obj_t *root)
      * The keyboard must not be a child of the hidden form_page, which
      * produced a clipped thin strip on real hardware in PR #36. */
     s_ui.keyboard = lv_keyboard_create(root);
-    lv_obj_set_pos(s_ui.keyboard, 38, 239);
     lv_obj_set_size(s_ui.keyboard, 724, 205);
+    /* LVGL keyboards default to bottom-middle alignment. Make the anchor
+     * explicitly top-left so (38,239) is a screen-space position. */
+    lv_obj_align(s_ui.keyboard, LV_ALIGN_TOP_LEFT, 38, 239);
     lv_obj_set_style_pad_all(s_ui.keyboard, 3, 0);
     lv_obj_set_style_pad_row(s_ui.keyboard, 3, 0);
     lv_obj_set_style_pad_column(s_ui.keyboard, 3, 0);
