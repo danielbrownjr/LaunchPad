@@ -15,7 +15,7 @@ int main(void)
     assert(strcmp(rendered, "Fonda's House of Plastique") == 0);
     assert(memcmp(raw, before, sizeof(raw)) == 0); /* Never mutate the SSID. */
 
-    const char left_quote[] = "A\xE2\x80\x98B";
+    const char left_quote[] = "A\xE2\x80\x98" "B";
     lp_wifi_display_ssid(rendered, sizeof(rendered), left_quote);
     assert(strcmp(rendered, "A'B") == 0);
 
