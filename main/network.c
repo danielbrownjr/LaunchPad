@@ -56,6 +56,7 @@ static portMUX_TYPE s_command_lock = portMUX_INITIALIZER_UNLOCKED;
 static lp_net_command_t s_command;
 static lp_net_scan_t s_scan;
 static char s_saved_ssid[LP_SSID_MAX + 1];
+static char s_station_ipv4[16]; /* Dotted-decimal IPv4; protected by s_command_lock. */
 static atomic_bool s_wifi_ready = ATOMIC_VAR_INIT(false);
 static atomic_int s_scan_status = ATOMIC_VAR_INIT(LP_SCAN_IDLE);
 static atomic_int s_save_status = ATOMIC_VAR_INIT(LP_SAVE_IDLE);
@@ -86,6 +87,28 @@ void lp_network_saved_ssid(char *out, size_t len)
     if (n >= len) n = len - 1;
     memcpy(out, s_saved_ssid, n);
     out[n] = '\0';
+    portEXIT_CRITICAL(&s_command_lock);
+}
+
+void lp_network_ipv4(char *out, size_t len)
+{
+    if (!out || len == 0) return;
+    portENTER_CRITICAL(&s_command_lock);
+    size_t n = strnlen(s_station_ipv4, sizeof(s_station_ipv4));
+    if (n >= len) n = len - 1;
+    memcpy(out, s_station_ipv4, n);
+    out[n] = '\0';
+    portEXIT_CRITICAL(&s_command_lock);
+}
+
+static void set_station_ipv4(const char *address)
+{
+    portENTER_CRITICAL(&s_command_lock);
+    memset(s_station_ipv4, 0, sizeof(s_station_ipv4));
+    if (address) {
+        size_t n = strnlen(address, sizeof(s_station_ipv4) - 1);
+        memcpy(s_station_ipv4, address, n);
+    }
     portEXIT_CRITICAL(&s_command_lock);
 }
 
@@ -278,14 +301,20 @@ static void event_handler(void *arg, esp_event_base_t base,
                           int32_t id, void *data)
 {
     (void)arg;
-    (void)data;
     if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
+        const ip_event_got_ip_t *got_ip = (const ip_event_got_ip_t *)data;
+        if (!got_ip) return;
+        char address[16];
+        snprintf(address, sizeof(address), IPSTR, IP2STR(&got_ip->ip_info.ip));
+        set_station_ipv4(address);
         set_state(LP_NET_IP_READY);
         xEventGroupSetBits(s_events, NET_IP);
     } else if (base == IP_EVENT && id == IP_EVENT_STA_LOST_IP) {
+        set_station_ipv4(NULL);
         set_state(LP_NET_DISCONNECTED);
         xEventGroupSetBits(s_events, NET_DISCONNECT);
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        set_station_ipv4(NULL);
         set_state(LP_NET_DISCONNECTED);
         xEventGroupSetBits(s_events, NET_DISCONNECT);
     }
