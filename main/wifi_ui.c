@@ -6,6 +6,7 @@
 #include "wifi_ui.h"
 #include "network.h"
 #include "credentials.h"
+#include "wifi_keyboard.h"
 
 #include <stdio.h>
 #include "esp_log.h"
@@ -321,6 +322,7 @@ static void create_panel(lv_obj_t *root)
     lv_obj_set_style_pad_all(s_ui.keyboard, 3, 0);
     lv_obj_set_style_pad_row(s_ui.keyboard, 3, 0);
     lv_obj_set_style_pad_column(s_ui.keyboard, 3, 0);
+    lp_wifi_keyboard_apply_layout(s_ui.keyboard);
     lv_keyboard_set_popovers(s_ui.keyboard, false);
     lv_keyboard_set_textarea(s_ui.keyboard, s_ui.password);
     lv_obj_add_flag(s_ui.keyboard, LV_OBJ_FLAG_HIDDEN);
