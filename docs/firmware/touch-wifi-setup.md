@@ -57,3 +57,30 @@ Physical validation should include network scan while unconfigured and
 already connected, on-screen keyboard accuracy, password masking, AP
 selection and manual entry, NVS save, reboot auto-join, change to a new
 network, forget confirmation, and no regression to the live clock.
+
+## PR #36 touchscreen correction: initial hardware failure
+
+On the first hardware flash (firmware `f70f37d8`), network scanning, saved-credential
+DHCP/SNTP, independent image readback and normal stack margins passed, but
+the **keyboard showed only a thin line at the bottom**. No new credentials
+were entered and no credential-related tests were accepted. Main task stack
+headroom was 7,484 bytes. The private test log was retained on the operator's
+Windows machine; it was not uploaded into this repository.
+
+The new commit moves the keyboard out of the **initially hidden LVGL form**
+and into a separate screen-level overlay at **(38,239), 724x205 px** on the
+800x480 display. It is kept hidden on the network list and shown on the
+password form after a layout update. Viewport bounds are logged without
+including any password or SSID, and invalid geometry disables entry.
+
+The dashboard header now shows a **white settings gear** instead of the
+text button, with a Wi-Fi symbol **immediately to its right**: blue after
+actual DHCP-IP acquisition (also while SNTP sync is pending/complete), grey
+while unconfigured, connecting, offline or in error. A previously synchronized
+clock by itself never turns the symbol blue.
+
+**Repeat the full keyboard-visibility and touch row test with fake text only
+before entering any real credentials.** Do not merge until it passes the
+physical test. The existing working saved P4 NVS connection should remain
+untouched; test switching/forget only after keyboard validation and explicit
+operator approval.

@@ -113,6 +113,13 @@ static void enter_form(const char *network_name)
     ESP_LOGI(TAG, "keyboard viewport (%ld,%ld)-(%ld,%ld), %ldx%ld",
              (long)kb.x1, (long)kb.y1, (long)kb.x2, (long)kb.y2,
              (long)lv_area_get_width(&kb), (long)lv_area_get_height(&kb));
+    if (kb.x1 < 0 || kb.y1 < 0 || kb.x2 >= 800 || kb.y2 >= 480 ||
+        lv_area_get_width(&kb) < 670 || lv_area_get_height(&kb) < 185) {
+        ESP_LOGE(TAG, "keyboard bounds invalid, refusing credential entry");
+        lv_obj_add_flag(s_ui.keyboard, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(s_ui.form_feedback,
+                          "Keyboard layout failed; entry disabled.");
+    }
 }
 
 static void picked_network(lv_event_t *event)
