@@ -9,6 +9,7 @@ on:
       - "sdkconfig.defaults"
       - "dependencies.lock"
       - "tests/**"
+      - "tools/**"
   workflow_dispatch:
 
 concurrency:
@@ -50,8 +51,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: launchpad-p4-offline-${{ github.event.pull_request.head.sha || github.sha }}
+          # launchpad.elf/.map are never flashed; they let a task-watchdog or
+          # panic backtrace from this exact image be decoded (issue #37).
           path: |
             build/launchpad.bin
+            build/launchpad.elf
+            build/launchpad.map
             build/bootloader/bootloader.bin
             build/partition_table/partition-table.bin
             build/flasher_args.json
