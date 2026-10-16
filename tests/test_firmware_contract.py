@@ -156,12 +156,18 @@ class BringupGuards(unittest.TestCase):
         self.assertIn("lv_textarea_set_password_mode(s_ui.password, true)", ui)
         self.assertIn("lv_textarea_set_password_show_time(s_ui.password, 0)", ui)
         self.assertIn("lv_keyboard_set_textarea(", ui)
-        # PR #36 hardware: keyboard rendered as a clipped thin strip because it
-        # lived under the initially hidden form. Require screen overlay instead.
+        # PR #36 hardware: hidden-form clipping, then bottom-middle default
+        # alignment shifted the screen-level keyboard off-screen. Require an
+        # explicit top-left screen anchor, not a relative position offset.
         self.assertIn("s_ui.keyboard = lv_keyboard_create(root);", ui)
         self.assertNotIn("lv_keyboard_create(s_ui.form_page)", ui)
-        self.assertIn("lv_obj_set_pos(s_ui.keyboard, 38, 239)", ui)
         self.assertIn("lv_obj_set_size(s_ui.keyboard, 724, 205)", ui)
+        self.assertIn("lv_obj_align(s_ui.keyboard, LV_ALIGN_TOP_LEFT, 38, 239)", ui)
+        self.assertNotIn("lv_obj_set_pos(s_ui.keyboard", ui)
+        self.assertLess(
+            ui.index("lv_obj_set_size(s_ui.keyboard, 724, 205)"),
+            ui.index("lv_obj_align(s_ui.keyboard, LV_ALIGN_TOP_LEFT, 38, 239)")
+        )
         self.assertIn("lv_obj_remove_flag(s_ui.keyboard, LV_OBJ_FLAG_HIDDEN)", ui)
         self.assertIn("lv_obj_move_foreground(s_ui.keyboard)", ui)
         self.assertIn("lv_obj_update_layout(s_ui.keyboard)", ui)
