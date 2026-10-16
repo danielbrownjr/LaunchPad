@@ -173,7 +173,6 @@ class BringupGuards(unittest.TestCase):
         self.assertIn("network == LP_NET_IP_READY", ui)
         self.assertIn("network == LP_NET_SYNCING", ui)
         self.assertIn("network == LP_NET_SYNCED", ui)
-        self.assertIn("lv_obj_set_pos(open", ui) if False else None
         self.assertIn("lp_network_request_scan()", ui)
         self.assertIn("lp_network_submit_credentials(&credentials)", ui)
         self.assertIn("lp_network_forget_saved()", ui)
