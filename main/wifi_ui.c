@@ -8,6 +8,9 @@
 #include "credentials.h"
 
 #include <stdio.h>
+#include "esp_log.h"
+
+static const char *TAG = "lp_wifi_ui";
 #include <string.h>
 
 typedef struct {
@@ -22,6 +25,8 @@ typedef struct {
     lv_obj_t *ssid;
     lv_obj_t *password;
     lv_obj_t *keyboard;
+    lv_obj_t *wifi_indicator;
+    bool connected_indicator;
     lp_net_scan_t snapshot;
     lp_net_scan_status_t last_scan;
     lp_net_save_status_t last_save;
@@ -63,6 +68,7 @@ static void show_list(void)
     if (!s_ui.panel) return;
     if (s_ui.password) lv_textarea_set_text(s_ui.password, "");
     lv_obj_add_flag(s_ui.form_page, LV_OBJ_FLAG_HIDDEN);
+    if (s_ui.keyboard) lv_obj_add_flag(s_ui.keyboard, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(s_ui.list_page, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -96,6 +102,17 @@ static void enter_form(const char *network_name)
                              network_name ? s_ui.password : s_ui.ssid);
     lv_obj_add_flag(s_ui.list_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(s_ui.form_page, LV_OBJ_FLAG_HIDDEN);
+    /* Keep the native LVGL button matrix on the SCREEN, never in the
+     * initially hidden / clipped form container. Geometry must be computed
+     * after the parent screen and keyboard are both visible. */
+    lv_obj_remove_flag(s_ui.keyboard, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(s_ui.keyboard);
+    lv_obj_update_layout(s_ui.keyboard);
+    lv_area_t kb;
+    lv_obj_get_coords(s_ui.keyboard, &kb);
+    ESP_LOGI(TAG, "keyboard viewport (%ld,%ld)-(%ld,%ld), %ldx%ld",
+             (long)kb.x1, (long)kb.y1, (long)kb.x2, (long)kb.y2,
+             (long)lv_area_get_width(&kb), (long)lv_area_get_height(&kb));
 }
 
 static void picked_network(lv_event_t *event)
@@ -260,10 +277,18 @@ static void create_panel(lv_obj_t *root)
     button(s_ui.form_page, "Back", 12, 107, 144, 42, back_to_scan);
     s_ui.form_feedback = label(s_ui.form_page, "", 169, 119, 298);
     button(s_ui.form_page, "Save & connect", 483, 107, 196, 42, save_pressed);
-    s_ui.keyboard = lv_keyboard_create(s_ui.form_page);
-    lv_obj_set_pos(s_ui.keyboard, 12, 156);
-    lv_obj_set_size(s_ui.keyboard, 670, 171);
+    /* Full-screen-root overlay: 800x480 fixed pixel viewport.
+     * The keyboard must not be a child of the hidden form_page, which
+     * produced a clipped thin strip on real hardware in PR #36. */
+    s_ui.keyboard = lv_keyboard_create(root);
+    lv_obj_set_pos(s_ui.keyboard, 38, 239);
+    lv_obj_set_size(s_ui.keyboard, 724, 205);
+    lv_obj_set_style_pad_all(s_ui.keyboard, 3, 0);
+    lv_obj_set_style_pad_row(s_ui.keyboard, 3, 0);
+    lv_obj_set_style_pad_column(s_ui.keyboard, 3, 0);
+    lv_keyboard_set_popovers(s_ui.keyboard, false);
     lv_keyboard_set_textarea(s_ui.keyboard, s_ui.password);
+    lv_obj_add_flag(s_ui.keyboard, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_event_cb(s_ui.ssid, focus_field, LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(s_ui.password, focus_field, LV_EVENT_CLICKED, NULL);
     lv_obj_add_flag(s_ui.form_page, LV_OBJ_FLAG_HIDDEN);
@@ -284,12 +309,34 @@ static void open_setup(lv_event_t *event)
 
 void lp_wifi_ui_init(lv_obj_t *root, bool touch_ready)
 {
-    lv_obj_t *open = button(root, "Wi-Fi Setup", 609, 12, 166, 42, open_setup);
+    /* White settings gear, then the independent Wi-Fi status symbol on its RIGHT.
+     * Only actual DHCP-IP states are blue, not a stale system clock. */
+    lv_obj_t *open = button(root, LV_SYMBOL_SETTINGS, 671, 12, 54, 42, open_setup);
+    lv_obj_set_style_bg_opa(open, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(open, 0, 0);
+    lv_obj_t *gear = lv_obj_get_child(open, 0);
+    lv_obj_set_style_text_color(gear, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(gear, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_bg_opa(gear, LV_OPA_TRANSP, 0);
     if (!touch_ready) lv_obj_add_state(open, LV_STATE_DISABLED);
+
+    s_ui.wifi_indicator = label(root, LV_SYMBOL_WIFI, 737, 20, 39);
+    lv_obj_set_style_text_font(s_ui.wifi_indicator, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(s_ui.wifi_indicator, lv_color_hex(0x87919F), 0);
+    s_ui.connected_indicator = false;
 }
 
 void lp_wifi_ui_tick(void)
 {
+    /* The header symbol updates every second even while Settings is closed. */
+    lp_net_state_t network = lp_network_state();
+    bool connected = network == LP_NET_IP_READY ||
+                     network == LP_NET_SYNCING || network == LP_NET_SYNCED;
+    if (s_ui.wifi_indicator && connected != s_ui.connected_indicator) {
+        s_ui.connected_indicator = connected;
+        lv_obj_set_style_text_color(s_ui.wifi_indicator,
+            lv_color_hex(connected ? 0x389AFF : 0x87919F), 0);
+    }
     if (!s_ui.panel || lv_obj_has_flag(s_ui.panel, LV_OBJ_FLAG_HIDDEN)) return;
     const char *net = "C5 starting";
     switch (lp_network_state()) {
