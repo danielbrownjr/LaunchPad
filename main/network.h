@@ -62,3 +62,6 @@ lp_net_scan_status_t lp_network_scan_status(void);
 void lp_network_scan_copy(lp_net_scan_t *out);
 lp_net_save_status_t lp_network_save_status(void);
 void lp_network_saved_ssid(char *out, size_t len);
+
+/* DHCP-assigned station IPv4 snapshot; empty if not currently connected. */
+void lp_network_ipv4(char *out, size_t len);
