@@ -21,6 +21,7 @@ typedef struct {
     lv_obj_t *message;
     lv_obj_t *saved;
     lv_obj_t *network_status;
+    lv_obj_t *ip_address;
     lv_obj_t *form_feedback;
     lv_obj_t *ssid;
     lv_obj_t *password;
@@ -34,6 +35,28 @@ typedef struct {
 } wifi_view_t;
 
 static wifi_view_t s_ui;
+
+/* U+2018/U+2019 smart apostrophes are absent from the pinned Montserrat
+ * subset. Substitute ASCII apostrophes ONLY for UI labels. The original
+ * SSID bytes remain unchanged for selection, connection and P4 NVS. */
+static void display_ssid(char *out, size_t capacity, const char *ssid)
+{
+    if (!out || capacity == 0) return;
+    size_t used = 0;
+    size_t i = 0;
+    size_t len = ssid ? strnlen(ssid, LP_SSID_MAX) : 0;
+    while (i < len && used + 1 < capacity) {
+        const unsigned char *p = (const unsigned char *)ssid;
+        if (i + 2 < len && p[i] == 0xE2 && p[i + 1] == 0x80 &&
+            (p[i + 2] == 0x98 || p[i + 2] == 0x99)) {
+            out[used++] = '\'';
+            i += 3;
+        } else {
+            out[used++] = ssid[i++];
+        }
+    }
+    out[used] = '\0';
+}
 
 static lv_obj_t *label(lv_obj_t *parent, const char *text, int x, int y, int width)
 {
@@ -216,8 +239,10 @@ static void render_scan(void)
     for (size_t i = 0; i < s_ui.snapshot.count; ++i) {
         lp_net_ap_t *ap = &s_ui.snapshot.aps[i];
         char line[100];
+        char shown_ssid[LP_SSID_MAX + 1];
+        display_ssid(shown_ssid, sizeof(shown_ssid), ap->ssid);
         snprintf(line, sizeof(line), "%s   %d dBm   %s",
-                 ap->ssid, (int)ap->rssi,
+                 shown_ssid, (int)ap->rssi,
                  ap->personal_wpa ? "WPA" : "Unsupported security");
         lv_obj_t *item = lv_list_add_button(s_ui.ap_list, NULL, line);
         if (ap->personal_wpa) {
@@ -242,6 +267,7 @@ static void create_panel(lv_obj_t *root)
     lv_obj_remove_flag(s_ui.panel, LV_OBJ_FLAG_SCROLLABLE);
     label(s_ui.panel, "Wi-Fi settings", 14, 8, 190);
     s_ui.network_status = label(s_ui.panel, "Starting...", 211, 8, 415);
+    s_ui.ip_address = label(s_ui.panel, "IP: not assigned", 211, 30, 415);
     button(s_ui.panel, "Close", 648, 4, 94, 38, close_setup);
 
     s_ui.list_page = lv_obj_create(s_ui.panel);
@@ -361,9 +387,16 @@ void lp_wifi_ui_tick(void)
     lv_label_set_text(s_ui.network_status, net);
     char saved[LP_SSID_MAX + 1] = {0};
     lp_network_saved_ssid(saved, sizeof(saved));
+    char shown_ssid[LP_SSID_MAX + 1];
+    display_ssid(shown_ssid, sizeof(shown_ssid), saved);
     char line[72];
-    snprintf(line, sizeof(line), "Saved: %s", saved[0] ? saved : "none");
+    snprintf(line, sizeof(line), "Saved: %s", saved[0] ? shown_ssid : "none");
     lv_label_set_text(s_ui.saved, line);
+
+    char ipv4[16] = {0};
+    lp_network_ipv4(ipv4, sizeof(ipv4));
+    snprintf(line, sizeof(line), "IP: %s", ipv4[0] ? ipv4 : "not assigned");
+    lv_label_set_text(s_ui.ip_address, line);
 
     lp_net_scan_status_t scan = lp_network_scan_status();
     if (scan != s_ui.last_scan) {
@@ -376,10 +409,18 @@ void lp_wifi_ui_tick(void)
     if (save != s_ui.last_save) {
         s_ui.last_save = save;
         if (save == LP_SAVE_OK)
-            lv_label_set_text(s_ui.message, "Saved. Wi-Fi connecting automatically.");
+            lv_label_set_text(s_ui.message, connected ? "Saved." :
+                              "Saved. Wi-Fi connecting automatically.");
         else if (save == LP_SAVE_FORGOTTEN)
             lv_label_set_text(s_ui.message, "Saved network forgotten.");
         else if (save == LP_SAVE_FAILED)
             lv_label_set_text(s_ui.message, "Save/forget failed. Check device log.");
+    }
+    /* Complete the success message on DHCP, but never overwrite subsequent
+     * scan, forget, or error feedback with a stale save notification. */
+    if (save == LP_SAVE_OK && connected &&
+        strcmp(lv_label_get_text(s_ui.message),
+               "Saved. Wi-Fi connecting automatically.") == 0) {
+        lv_label_set_text(s_ui.message, "Saved.");
     }
 }
