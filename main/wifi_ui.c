@@ -7,6 +7,7 @@
 #include "network.h"
 #include "credentials.h"
 #include "wifi_keyboard.h"
+#include "wifi_text.h"
 
 #include <stdio.h>
 #include "esp_log.h"
@@ -36,28 +37,6 @@ typedef struct {
 } wifi_view_t;
 
 static wifi_view_t s_ui;
-
-/* U+2018/U+2019 smart apostrophes are absent from the pinned Montserrat
- * subset. Substitute ASCII apostrophes ONLY for UI labels. The original
- * SSID bytes remain unchanged for selection, connection and P4 NVS. */
-static void display_ssid(char *out, size_t capacity, const char *ssid)
-{
-    if (!out || capacity == 0) return;
-    size_t used = 0;
-    size_t i = 0;
-    size_t len = ssid ? strnlen(ssid, LP_SSID_MAX) : 0;
-    while (i < len && used + 1 < capacity) {
-        const unsigned char *p = (const unsigned char *)ssid;
-        if (i + 2 < len && p[i] == 0xE2 && p[i + 1] == 0x80 &&
-            (p[i + 2] == 0x98 || p[i + 2] == 0x99)) {
-            out[used++] = '\'';
-            i += 3;
-        } else {
-            out[used++] = ssid[i++];
-        }
-    }
-    out[used] = '\0';
-}
 
 static lv_obj_t *label(lv_obj_t *parent, const char *text, int x, int y, int width)
 {
@@ -241,7 +220,7 @@ static void render_scan(void)
         lp_net_ap_t *ap = &s_ui.snapshot.aps[i];
         char line[100];
         char shown_ssid[LP_SSID_MAX + 1];
-        display_ssid(shown_ssid, sizeof(shown_ssid), ap->ssid);
+        lp_wifi_display_ssid(shown_ssid, sizeof(shown_ssid), ap->ssid);
         snprintf(line, sizeof(line), "%s   %d dBm   %s",
                  shown_ssid, (int)ap->rssi,
                  ap->personal_wpa ? "WPA" : "Unsupported security");
@@ -390,7 +369,7 @@ void lp_wifi_ui_tick(void)
     char saved[LP_SSID_MAX + 1] = {0};
     lp_network_saved_ssid(saved, sizeof(saved));
     char shown_ssid[LP_SSID_MAX + 1];
-    display_ssid(shown_ssid, sizeof(shown_ssid), saved);
+    lp_wifi_display_ssid(shown_ssid, sizeof(shown_ssid), saved);
     char line[72];
     snprintf(line, sizeof(line), "Saved: %s", saved[0] ? shown_ssid : "none");
     lv_label_set_text(s_ui.saved, line);
