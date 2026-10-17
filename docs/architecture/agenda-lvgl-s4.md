@@ -15,8 +15,9 @@ The dashboard takes **one atomic store copy** into a static buffer, calls
 S3's pure-C `lp_agenda_vm_build` using the real SNTP-confirmed clock and
 separate network state, then invokes the S4 LVGL-only
 `lp_agenda_ui_apply`. No provider task touches LVGL. No LVGL callback
-updates the store or contacts the network. No new task, timer or per-refresh
-heap allocation is introduced. The eight-row details tree is created once.
+updates the store or contacts the network. No new task or timer is introduced and the eight-row details tree is
+created once. Label text changes can still allocate inside LVGL; callers
+avoid resubmitting identical strings to reduce redraw and allocator churn.
 
 Main-task stack safety: both the ~1.4 KiB store read buffer and the
 view model live in static storage, **not** automatic locals on the 8 KiB
