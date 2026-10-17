@@ -245,7 +245,8 @@ void lp_agenda_ui_apply(const lp_agenda_vm_t *view)
         update_text(ui->tag, row->tag);
         update_text(ui->label, row->label);
         update_text(ui->location, row->location);
-        if (restyle) set_muted(ui->label, view->dim_schedule);
+        if (restyle || lv_obj_has_flag(ui->card, LV_OBJ_FLAG_HIDDEN))
+            set_muted(ui->label, view->dim_schedule);
         lv_obj_remove_flag(ui->card, LV_OBJ_FLAG_HIDDEN);
     }
     s_last_dim = view->dim_schedule;
