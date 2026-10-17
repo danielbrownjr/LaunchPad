@@ -196,7 +196,7 @@ static void test_dst_fallback_demo_vs_bridge_ttl(void)
     assert_banner(&vm, LP_AGENDA_SCREEN_DEMO, "FICTIONAL DEMO SCHEDULE");
     assert(!vm.dim_schedule);
     assert(vm.has_hero); /* Yesterday's slot for today. */
-    assert(strcmp(vm.hero_time, "Nov 01 09:30 AM EST") != 0);
+    assert(strcmp(vm.hero_time, "Nov 01 09:30 AM EST") == 0);
     /* At 10 AM, yesterday's last slot is ongoing until 10:45 AM EST. */
     assert(strcmp(vm.hero_hint, "NOW UNTIL 10:45 AM EST") == 0);
 
