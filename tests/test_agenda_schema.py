@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = json.loads((ROOT / "tests/fixtures/agenda_cases.json").read_text(encoding="utf-8"))
 ITEM_KEYS = {"id", "label", "location_label", "status", "starts_at", "ends_at"}
-FEED_KEYS = {"schema_version", "source", "generated_at", "source_updated_at",
+FEED_KEYS = {"schema_version", "source", "generated_at", "source_checked_at",
              "time_zone", "ttl_seconds", "appointments"}
 STRICT_TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)\Z")
 IDENTIFIER = re.compile(r"[A-Za-z0-9._-]{1,24}\Z")
@@ -54,10 +54,10 @@ def validate_wire(data):
         return False
     try:
         generated = wire_time(data["generated_at"])
-        updated = wire_time(data["source_updated_at"])
+        checked = wire_time(data["source_checked_at"])
     except (ValueError, TypeError):
         return False
-    if updated > generated or generated.timestamp() <= 0 or updated.timestamp() <= 0:
+    if checked > generated or generated.timestamp() <= 0 or checked.timestamp() <= 0:
         return False
     items = data["appointments"]
     if not isinstance(items, list) or len(items) > 8:
@@ -111,7 +111,7 @@ def assess_view(data, now, clock_valid=True):
     if data["source"] == "demo":
         return "DEMO"
     generated = wire_time(data["generated_at"])
-    checked = wire_time(data["source_updated_at"])
+    checked = wire_time(data["source_checked_at"])
     if max(generated, checked) - now > dt.timedelta(seconds=300):
         return "INVALID"
     ttl = dt.timedelta(seconds=data["ttl_seconds"])

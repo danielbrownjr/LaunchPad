@@ -25,7 +25,7 @@ Large current time, next appointment/time, location label, what comes next, and 
 DEMO / CURRENT / STALE / OFFLINE / NO_JOBS / CLOCK_UNSYNCED / ERROR. Wi-Fi connected is not proof of current schedule data.
 
 ## Draft JSON fields
-`schema_version`, `generated_at`, `source`, `source_updated_at`, `status`, `time_zone`, and bounded `appointments[]` with `id`, `starts_at`, `label`, `location_label`, `job_ref`. Treat these as a proposal and verify actual Simpro schema after approval.
+`schema_version`, `generated_at`, `source`, `source_checked_at`, `status`, `time_zone`, and bounded `appointments[]` with `id`, `starts_at`, `label`, `location_label`, `job_ref`. Treat these as a proposal and verify actual Simpro schema after approval.
 
 Reject invalid timestamps, oversized strings/lists and malformed JSON. Transport timestamps in UTC or with an explicit offset; render with verified local timezone/DST handling.
 

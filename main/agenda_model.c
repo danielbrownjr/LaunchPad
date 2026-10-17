@@ -58,8 +58,8 @@ bool lp_agenda_validate(const lp_agenda_snapshot_t *snapshot)
          snapshot->source != LP_AGENDA_SOURCE_BRIDGE) ||
         snapshot->count > LP_AGENDA_MAX_ITEMS ||
         snapshot->generated_at_utc <= 0 ||
-        snapshot->source_updated_at_utc <= 0 ||
-        snapshot->source_updated_at_utc > snapshot->generated_at_utc ||
+        snapshot->source_checked_at_utc <= 0 ||
+        snapshot->source_checked_at_utc > snapshot->generated_at_utc ||
         snapshot->ttl_seconds < LP_AGENDA_TTL_MIN_S ||
         snapshot->ttl_seconds > LP_AGENDA_TTL_MAX_S)
         return false;
@@ -100,12 +100,12 @@ lp_agenda_view_t lp_agenda_view(const lp_agenda_snapshot_t *snapshot,
      * five minutes of clock/transport skew but never time-travel CURRENT. */
     if ((snapshot->generated_at_utc > now_utc &&
          snapshot->generated_at_utc - now_utc > 300) ||
-        (snapshot->source_updated_at_utc > now_utc &&
-         snapshot->source_updated_at_utc - now_utc > 300))
+        (snapshot->source_checked_at_utc > now_utc &&
+         snapshot->source_checked_at_utc - now_utc > 300))
         return LP_AGENDA_VIEW_INVALID;
 
     if (now_utc - snapshot->generated_at_utc > snapshot->ttl_seconds ||
-        now_utc - snapshot->source_updated_at_utc > snapshot->ttl_seconds)
+        now_utc - snapshot->source_checked_at_utc > snapshot->ttl_seconds)
         return LP_AGENDA_VIEW_STALE;
 
     /* A cancelled, unscheduled or fully completed day is not a live

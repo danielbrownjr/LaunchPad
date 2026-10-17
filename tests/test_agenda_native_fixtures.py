@@ -76,7 +76,7 @@ def representable(wire):
     if set(wire) != FEED_KEYS or wire["time_zone"] != "America/New_York":
         return False
     try:
-        for stamp in (wire["generated_at"], wire["source_updated_at"]):
+        for stamp in (wire["generated_at"], wire["source_checked_at"]):
             wire_time(stamp)
         for item in wire["appointments"]:
             if set(item) != ITEM_KEYS:
@@ -99,7 +99,7 @@ def driver_source(cases, now):
             f"    s.schema_version = {int(w['schema_version'])}U;",
             f"    s.source = {SOURCES.get(w['source'], '(lp_agenda_source_t)0')};",
             f"    s.generated_at_utc = {epoch(w['generated_at'])}LL;",
-            f"    s.source_updated_at_utc = {epoch(w['source_updated_at'])}LL;",
+            f"    s.source_checked_at_utc = {epoch(w['source_checked_at'])}LL;",
             f"    s.ttl_seconds = {int(w['ttl_seconds'])}U;",
             f"    s.count = {len(items)}U;",
         ]

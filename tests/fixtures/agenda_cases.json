@@ -12,7 +12,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": []
@@ -27,7 +27,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -51,7 +51,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -91,7 +91,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -123,7 +123,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -147,7 +147,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -179,7 +179,7 @@
         "schema_version": 1,
         "source": "bridge",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T09:00:00Z",
+        "source_checked_at": "2026-10-17T09:00:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -203,7 +203,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -227,7 +227,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -315,7 +315,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -347,7 +347,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -371,7 +371,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -395,7 +395,7 @@
         "schema_version": 2,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": []
@@ -410,7 +410,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [],
@@ -426,7 +426,7 @@
         "schema_version": 1,
         "source": "bridge",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -458,7 +458,7 @@
         "schema_version": 1,
         "source": "bridge",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -498,7 +498,7 @@
         "schema_version": 1,
         "source": "bridge",
         "generated_at": "2026-10-17T12:10:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [
@@ -522,7 +522,7 @@
         "schema_version": 1,
         "source": "demo",
         "generated_at": "2026-10-17T12:00:00Z",
-        "source_updated_at": "2026-10-17T11:59:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [

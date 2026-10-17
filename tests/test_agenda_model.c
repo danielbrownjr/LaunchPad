@@ -12,7 +12,7 @@ static lp_agenda_snapshot_t fixture(void)
         .schema_version = LP_AGENDA_SCHEMA_VERSION,
         .source = LP_AGENDA_SOURCE_DEMO,
         .generated_at_utc = FIXED_NOW,
-        .source_updated_at_utc = FIXED_NOW - 60,
+        .source_checked_at_utc = FIXED_NOW - 60,
         .ttl_seconds = 3600,
         .count = 1,
     };
@@ -157,7 +157,7 @@ static void test_invalid_input(void)
     assert(!lp_agenda_validate(&data)); /* duplicate opaque ID */
     data = fixture();
 
-    data.source_updated_at_utc = data.generated_at_utc + 1;
+    data.source_checked_at_utc = data.generated_at_utc + 1;
     assert(!lp_agenda_validate(&data));
     data = fixture();
 
@@ -206,19 +206,19 @@ static void test_ttl_boundary(void)
 {
     lp_agenda_snapshot_t data = fixture();
     data.source = LP_AGENDA_SOURCE_BRIDGE;
-    data.source_updated_at_utc = data.generated_at_utc;
+    data.source_checked_at_utc = data.generated_at_utc;
     data.items[0].ends_at_utc = FIXED_NOW + 86400;
     const int64_t ttl = data.ttl_seconds;
     assert(lp_agenda_view(&data, FIXED_NOW + ttl, true) == LP_AGENDA_VIEW_CURRENT);
     assert(lp_agenda_view(&data, FIXED_NOW + ttl + 1, true) == LP_AGENDA_VIEW_STALE);
 
     /* A freshly generated response cannot refresh an old upstream read. */
-    data.source_updated_at_utc = FIXED_NOW - 1;
+    data.source_checked_at_utc = FIXED_NOW - 1;
     assert(lp_agenda_view(&data, FIXED_NOW + ttl - 1, true) == LP_AGENDA_VIEW_CURRENT);
     assert(lp_agenda_view(&data, FIXED_NOW + ttl, true) == LP_AGENDA_VIEW_STALE);
 
     /* Up to five minutes of future skew is tolerated, not more. */
-    data.source_updated_at_utc = FIXED_NOW;
+    data.source_checked_at_utc = FIXED_NOW;
     assert(lp_agenda_view(&data, FIXED_NOW - 300, true) == LP_AGENDA_VIEW_CURRENT);
     assert(lp_agenda_view(&data, FIXED_NOW - 301, true) == LP_AGENDA_VIEW_INVALID);
 }

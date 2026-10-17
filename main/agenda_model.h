@@ -38,8 +38,9 @@ typedef struct {
     uint32_t schema_version;
     lp_agenda_source_t source;
     int64_t generated_at_utc;      /* When bridge generated this view. */
-    int64_t source_updated_at_utc; /* Last successful upstream read, not an
-                                    * upstream last-modified time. */
+    int64_t source_checked_at_utc; /* Last successful, verified upstream
+                                    * check; a cache read never refreshes it.
+                                    * Not an upstream last-modified time. */
     uint32_t ttl_seconds;          /* 60..86400, freshness is source-specific. */
     size_t count;
     lp_agenda_item_t items[LP_AGENDA_MAX_ITEMS];

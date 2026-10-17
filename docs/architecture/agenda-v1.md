@@ -20,7 +20,7 @@ them instead of silently displaying the wrong time.
   "schema_version": 1,
   "source": "demo",
   "generated_at": "2026-10-17T12:00:00Z",
-  "source_updated_at": "2026-10-17T11:59:00Z",
+  "source_checked_at": "2026-10-17T11:59:00Z",
   "time_zone": "America/New_York",
   "ttl_seconds": 3600,
   "appointments": [
@@ -48,7 +48,7 @@ not contact one today.
 | `schema_version` | Exactly integer `1`. Unknown versions rejected |
 | `source` | `demo` or reserved `bridge`; no current live provider |
 | `time_zone` | Explicit `America/New_York` for this prototype |
-| `generated_at`, `source_updated_at` | Explicit-offset timestamps, normalized to signed 64-bit UTC Unix seconds; source update must not follow generation |
+| `generated_at`, `source_checked_at` | Explicit-offset timestamps, normalized to signed 64-bit UTC Unix seconds; the source check must not follow generation |
 | `ttl_seconds` | Integer 60–86400 inclusive; bounded freshness horizon |
 | `appointments` | Array of 0–8; no unbounded allocations |
 | `id` | 1–24 ASCII bytes, letters/digits/`._-`; unique within snapshot; opaque and never shown |
@@ -70,7 +70,7 @@ Do not claim source-level fixture checks replace runtime parser tests.
 
 `DEMO` always remains `DEMO`, even with a functioning Wi-Fi connection.
 `CURRENT` requires a clock established by real time sync, a valid, recent
-bridge snapshot and its last successful upstream read (`source_updated_at`)
+bridge snapshot and its last verified upstream check (`source_checked_at`)
 no older than the TTL.
 A delayed bridge response alone cannot magically freshen old source data.
 `STALE` preserves provenance and allows a future UI to show older records
@@ -94,14 +94,14 @@ never chosen. End times are exclusive.
 - Appointment list and display strings are deliberately bounded; longer
   upstream text needs a documented truncation policy at the future bridge,
   not silent overflow on the MCU.
-- `source_updated_at` is the time the bridge last **successfully read the
-  schedule from the upstream source**. It is not the upstream record's
-  last-modified time: a schedule nobody has edited for two days is still
-  current if it was read a minute ago, while mapping a last-modified field
-  here would make every such day permanently `STALE`. It is also not the
-  time a bridge served its own cache; serving a cached copy must keep the
-  original read time. If a future source cannot confirm a read, the bridge
-  must expose that limitation, not fabricate a time.
+- `source_checked_at` is the time of the last **successful, verified check
+  of the schedule against the upstream source**. A local cache read must not
+  refresh it: a bridge serving cached data keeps the original check time.
+  It is not the upstream record's last-modified time either; a schedule
+  nobody has edited for two days is still current if it was checked a
+  minute ago. `generated_at` remains the time the bridge generated this
+  response, and the check must not follow it. If a future source cannot
+  verify a check, the bridge must expose that limitation, not fabricate it.
 
 ## Tests
 
