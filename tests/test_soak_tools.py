@@ -278,8 +278,8 @@ class SoakTools(unittest.TestCase):
         """
         main_c = (ROOT / "main/main.c").read_text(encoding="utf-8")
         match = re.search(
-            r'ESP_LOGI\\(TAG,\\s*"DIAG uptime_s=%"\\s*PRId64'
-            r'(?P<suffix>.*?)\\s*,\\s*uptime_s\\s*,',
+            r'ESP_LOGI\(TAG,\s*"DIAG uptime_s=%"\s*PRId64'
+            r'(?P<suffix>.*?)\s*,\s*uptime_s\s*,',
             main_c, re.DOTALL,
         )
         self.assertIsNotNone(match, "firmware DIAG format not found")
