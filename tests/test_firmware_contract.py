@@ -6,6 +6,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 BOARD = (ROOT / "main/board.c").read_text(encoding="utf-8")
 UI = (ROOT / "main/dashboard.c").read_text(encoding="utf-8")
+AGENDA_UI = (ROOT / "main/agenda_ui.c").read_text(encoding="utf-8")
+AGENDA_VM = (ROOT / "main/agenda_view.c").read_text(encoding="utf-8")
 NETWORK = (ROOT / "main/network.c").read_text(encoding="utf-8")
 NET_H = (ROOT / "main/network.h").read_text(encoding="utf-8")
 MAIN = (ROOT / "main/main.c").read_text(encoding="utf-8")
@@ -31,13 +33,17 @@ class BringupGuards(unittest.TestCase):
 
     def test_not_misrepresenting_data_or_clock(self):
         self.assertIn("CLOCK NOT SET", UI)
-        self.assertIn("SYNTHETIC DATA", UI)
-        self.assertIn("NOT A REAL APPOINTMENT", UI)
+        # S4 deliberately removes the hard-coded sample appointment. Its
+        # state and source must come from S3, not fictional static UI text.
+        self.assertIn("lp_agenda_ui_apply(&s_view)", UI)
+        self.assertIn("view->banner", AGENDA_UI)
+        self.assertIn("view->source", AGENDA_UI)
+        self.assertIn("FICTIONAL DEMO SCHEDULE", AGENDA_VM)
         self.assertIn("C5 OFF", UI)
         self.assertIn("C5 STARTING", UI)
         self.assertIn("WIFI NOT CONFIGURED", UI)
         self.assertIn("NETWORK ERROR", UI)
-        self.assertIn("TOUCH I2C READY", UI)
+        self.assertIn("I2C READY", UI)
         self.assertIn("TOUCH OFFLINE", UI)
         self.assertIn("TAP TO TEST", UI)
 
@@ -128,10 +134,11 @@ class BringupGuards(unittest.TestCase):
     def test_clock_sync_age_label_is_explicit_and_separate_from_validity(self):
         # Actual runtime SNTP interval is independent from the dashboard
         # label. The time remains displayed after a confirmed sync.
-        self.assertIn('lv_label_set_text(s_clock_status, "LAST SYNC >24H")', UI)
+        self.assertIn('if (lp_network_clock_stale()) status = "LAST SYNC >24H"', UI)
+        self.assertIn('else if (lp_network_state() == LP_NET_SYNCED) status = "TIME SYNCED"', UI)
+        self.assertIn('else status = "OFFLINE TIME"', UI)
+        self.assertIn("lv_label_set_text(s_clock_status, status)", UI)
         self.assertNotIn('lv_label_set_text(s_clock_status, "SYNC STALE")', UI)
-        self.assertIn('lv_label_set_text(s_clock_status, "TIME SYNCED")', UI)
-        self.assertIn('lv_label_set_text(s_clock_status, "OFFLINE TIME")', UI)
         self.assertIn('lv_label_set_text(s_clock_status, "CLOCK NOT SET")', UI)
         self.assertIn('elapsed > pdMS_TO_TICKS(24U * 60U * 60U * 1000U)', NETWORK)
         self.assertLess(UI.index('if (!lp_network_clock_valid())'),
@@ -182,7 +189,8 @@ class BringupGuards(unittest.TestCase):
         self.assertIn("lp_dashboard_update_clock()", MAIN)
         self.assertIn("localtime_r", clock)
         self.assertIn("CLOCK NOT SET", UI)
-        self.assertIn("SYNTHETIC DATA", UI)
+        self.assertIn("lp_agenda_vm_build(&s_store", UI)
+        self.assertIn("FICTIONAL DEMO SCHEDULE", AGENDA_VM)
         self.assertIn("CONFIG_COMPILER_OPTIMIZATION_SIZE=y", CONFIG)
 
 
