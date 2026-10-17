@@ -70,7 +70,8 @@ Do not claim source-level fixture checks replace runtime parser tests.
 
 `DEMO` always remains `DEMO`, even with a functioning Wi-Fi connection.
 `CURRENT` requires a clock established by real time sync, a valid, recent
-bridge snapshot and its upstream `source_updated_at` no older than the TTL.
+bridge snapshot and its last successful upstream read (`source_updated_at`)
+no older than the TTL.
 A delayed bridge response alone cannot magically freshen old source data.
 `STALE` preserves provenance and allows a future UI to show older records
 with explicit age; it must **not** display them as live jobs. `NO_JOBS`
@@ -93,9 +94,14 @@ never chosen. End times are exclusive.
 - Appointment list and display strings are deliberately bounded; longer
   upstream text needs a documented truncation policy at the future bridge,
   not silent overflow on the MCU.
-- `source_updated_at` means a *confirmed* upstream change timestamp, not
-  the time a client simply fetched cached information. If a future source
-  cannot provide it, the bridge must expose that limitation, not fabricate it.
+- `source_updated_at` is the time the bridge last **successfully read the
+  schedule from the upstream source**. It is not the upstream record's
+  last-modified time: a schedule nobody has edited for two days is still
+  current if it was read a minute ago, while mapping a last-modified field
+  here would make every such day permanently `STALE`. It is also not the
+  time a bridge served its own cache; serving a cached copy must keep the
+  original read time. If a future source cannot confirm a read, the bridge
+  must expose that limitation, not fabricate a time.
 
 ## Tests
 
