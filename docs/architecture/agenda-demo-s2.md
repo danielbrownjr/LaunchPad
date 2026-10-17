@@ -58,7 +58,10 @@ last-good records during FETCH_ERROR) and skips publishing if one is found.
 This check is **not atomic** with publication: a future concurrent bridge
 producer could publish between the check and the DEMO write. Future
 production/bridge mode MUST disable demo polling before starting a bridge
-writer, or add atomic source-ownership arbitration in the store. There is
+writer, or add atomic source-ownership arbitration in the store. The guard can only
+see a stored BRIDGE *snapshot*: a FETCH_ERROR raised before any snapshot was
+published is not attributable to a source, so DEMO would publish over it and
+report OK. That is one more reason the bridge mode must disable DEMO. There is
 no bridge producer in S2. This guard is defense in depth, not permission
 to access Simpro. Only separately approved code may create bridge data.
 
@@ -75,6 +78,19 @@ stable same-day generation, local midnight/year rollover, always having
 an upcoming fictional appointment, spring DST 23-hour and fall DST
 25-hour days, repeated-hour stability, store revision behavior, and a
 synthetic BRIDGE record not being overwritten by the demo provider.
+Absolute UTC start times are also checked against constants computed from
+the IANA `America/New_York` zone (not from the C library under test) for
+ordinary, both DST transition days, the repeated hour, leap and non-leap
+February (including 2100), year rollover and post-2038 dates, plus SNTP jumps
+backwards and forwards across days, publish-failure retry and same-day
+revision stability. The ESP32-P4 build links **picolibc**, not glibc; the same
+test file was run under picolibc on the ESP-IDF 6.0.3 ESP32-C3 QEMU target as
+a one-off review check (QEMU has no P4 machine). That run is not part of CI.
+
+`ttl_seconds` is 86,400, but DEMO is regenerated per local day, and a fall-back
+day lasts 25 hours. `lp_agenda_view` returns DEMO before any TTL check, so this
+has no effect today. S3 must not apply TTL staleness to DEMO.
+
 Warnings are errors. The existing ESP-IDF 6.0.3 ESP32-P4 CI and partition
 fit check remain mandatory.
 
