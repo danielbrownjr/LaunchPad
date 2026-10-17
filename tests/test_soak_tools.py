@@ -1,5 +1,6 @@
 """Host tests for the issue #37 soak tools. No serial port or hardware needed."""
 import contextlib
+import datetime as dt
 import importlib.util
 import io
 import re
@@ -57,11 +58,7 @@ SAMPLE = [
 
 
 class SoakTools(unittest.TestCase):
-    def summarize(self, *flags):
-        with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False, encoding="utf-8") as f:
-            for n, text in enumerate(SAMPLE):
-                f.write(f"2026-10-16T12:00:{n:02d}.000+00:00 {n * 0.5:11.3f} | {text}\n")
-            path = f.name
+    def run_summarizer(self, path, flags):
         module = load_summarizer()
         out = io.StringIO()
         argv = sys.argv
@@ -73,6 +70,13 @@ class SoakTools(unittest.TestCase):
             sys.argv = argv
             Path(path).unlink()
         return out.getvalue()
+
+    def summarize(self, *flags):
+        with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False, encoding="utf-8") as f:
+            for n, text in enumerate(SAMPLE):
+                f.write(f"2026-10-16T12:00:{n:02d}.000+00:00 {n * 0.5:11.3f} | {text}\n")
+            path = f.name
+        return self.run_summarizer(path, flags)
 
     def test_summary_counts(self):
         text = self.summarize()
@@ -164,6 +168,75 @@ class SoakTools(unittest.TestCase):
         text = self.summarize("--from", "2026-10-16T12:00:01Z",
                               "--to", "2026-10-16T12:04:00Z")
         self.assertIn("coverage INCOMPLETE", text)
+
+    def summarize_timed(self, lines, *flags):
+        """lines: (seconds after 12:00:00Z, text); logger elapsed == seconds."""
+        base = dt.datetime(2026, 10, 16, 12, tzinfo=dt.timezone.utc)
+        with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False, encoding="utf-8") as f:
+            for sec, text in lines:
+                stamp = (base + dt.timedelta(seconds=sec)).isoformat(timespec="milliseconds")
+                f.write(f"{stamp} {sec:11.3f} | {text}\n")
+            path = f.name
+        return self.run_summarizer(path, flags)
+
+    def test_window_keeps_outage_after_pre_window_dhcp(self):
+        # Regression: connectivity established before --from must not hide
+        # a disconnect inside the window (seen on the real issue #37 log).
+        lines = [(0, "I (1000) lp_network: DHCP IP acquired; starting SNTP"),
+                 (100, "I (101000) RPC_WRAP: ESP Event: Station mode: Disconnected"),
+                 (101, "W (101500) lp_network: Wi-Fi unavailable, retrying in 1 seconds"),
+                 (160, "I (160000) lp_network: DHCP IP acquired; starting SNTP"),
+                 (200, "I (200000) lp_network: idle")]
+        text = self.summarize_timed(lines, "--from", "2026-10-16T12:00:50Z",
+                                    "--to", "2026-10-16T12:03:20Z")
+        self.assertIn("Wi-Fi outage events: 1", text)
+        self.assertIn("duration 0h01m00s; retries 1\n", text)
+
+    def test_outage_spanning_window_start_is_flagged(self):
+        lines = [(0, "I (1000) lp_network: DHCP IP acquired; starting SNTP"),
+                 (30, "I (31000) RPC_WRAP: ESP Event: Station mode: Disconnected"),
+                 (100, "I (100000) lp_network: DHCP IP acquired; starting SNTP"),
+                 (200, "I (200000) lp_network: idle")]
+        text = self.summarize_timed(lines, "--from", "2026-10-16T12:00:50Z")
+        self.assertIn("Wi-Fi outage events: 1", text)
+        self.assertIn("[began before window]", text)
+
+    def test_disconnect_with_unknown_prior_state(self):
+        module = load_summarizer()
+        events = module.analyze_wifi([
+            ("A", 0.0, "I (1) RPC_WRAP: ESP Event: Station mode: Disconnected"),
+            ("B", 5.0, "I (2) lp_network: DHCP IP acquired; starting SNTP")])
+        self.assertEqual(len(events), 1)
+        self.assertTrue(events[0]["prior_unknown"])
+
+    def test_reset_at_window_start_detected(self):
+        lines = [(0, "I (25800) lp_network: up"),
+                 (60, "I (300) launchpad: Dashboard running"),
+                 (90, "I (30300) lp_network: up")]
+        text = self.summarize_timed(lines, "--from", "2026-10-16T12:00:50Z")
+        self.assertIn("reset events (banner or uptime regression): 1", text)
+
+    def test_diag_stale_and_multiboot_trends(self):
+        diag = ("I ({ms}) launchpad: DIAG uptime_s={up} internal_free_b={free} internal_min_b=1"
+                " psram_free_b=2 psram_min_b=2 main_stack_hwm_b=3"
+                " network_stack_hwm_b=4 network_sample_age_s=5 network_valid=1")
+        lines = [(0, diag.format(ms=0, up=0, free=900)),
+                 (3600, diag.format(ms=3600000, up=3600, free=800)),
+                 (4000, diag.format(ms=1000, up=1, free=500)),
+                 (14000, "I (11000000) lp_network: idle")]
+        text = self.summarize_timed(lines)
+        self.assertIn("samples span 2 boots", text)
+        self.assertIn("internal_free_b: first=500 last=500", text)
+        self.assertIn("DIAG STALE", text)
+
+    def test_diag_interval_gap_within_one_boot(self):
+        diag = ("I ({ms}) launchpad: DIAG uptime_s={up} internal_free_b=1 internal_min_b=1"
+                " psram_free_b=2 psram_min_b=2 main_stack_hwm_b=3"
+                " network_stack_hwm_b=4 network_sample_age_s=5 network_valid=1")
+        lines = [(0, diag.format(ms=0, up=0)), (9000, diag.format(ms=9000000, up=9000))]
+        text = self.summarize_timed(lines)
+        self.assertIn("WARNING: DIAG interval up to 2h30m00s", text)
+        self.assertNotIn("DIAG STALE", text)
 
     def test_port_unavailable_rate_limited(self):
         logger = load_logger()

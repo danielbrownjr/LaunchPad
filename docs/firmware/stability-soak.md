@@ -43,10 +43,19 @@ The summarizer detects an ESP-IDF reboot from a captured `rst:` banner and
 from substantial backwards movement of its `I (uptime_ms)`-style log
 timestamps; it reports whether a preceding USB loss was seen. Opening a
 read-only serial port is **not** evidence that the monitor caused a reset.
-Wi-Fi outages are grouped from the first disconnect after established
-connectivity through renewed DHCP, with duplicate disconnect messages
-suppressed and retries counted. Windows beginning in a disconnected state
-cannot prove when that outage began.
+Wi-Fi outages are grouped from the first disconnect through renewed DHCP,
+with duplicate disconnect messages suppressed and retries counted. Reset and
+Wi-Fi state are tracked across the **whole** log and then filtered to the
+window, so connectivity established before `--from` cannot hide an outage
+inside it. An outage overlapping the window start is marked
+`began before window`; a disconnect before any logged connectivity is marked
+`state before first disconnect unknown`.
+
+`DIAG` trends cover the latest boot only when samples span a reset. The
+summary prints the latest sample's age and warns `DIAG STALE` when it is
+more than 65 minutes before the window end, or when two samples within one
+boot are more than 65 minutes apart. Either can mean a stalled LVGL loop, an
+uncaptured reset, or telemetry disabled at build time.
 
 The logger retries reconnecting every 100 ms for the first 10 seconds of an
 unavailable port, then once per second. It reports the first failed open and

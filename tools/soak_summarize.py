@@ -61,6 +61,8 @@ DIAG_FIELDS = (
     "psram_min_b", "main_stack_hwm_b", "network_stack_hwm_b",
     "network_sample_age_s", "network_valid"
 )
+DIAG_PERIOD_S = 3600
+DIAG_SLACK_S = 300
 
 BLOCK_START = re.compile(r"Task watchdog got triggered|Guru Meditation|abort\(\) was called|Stack smashing|assert failed")
 
@@ -121,13 +123,14 @@ def analyze_resets(rows):
 
 def analyze_wifi(rows):
     """Count connectivity outages, not repeated disconnect notifications."""
-    online = False
+    online = None  # unknown until the log shows connectivity or its loss
     outage = None
     events = []
     for stamp, elapsed, line in rows:
         if WIFI_DOWN.search(line):
-            if online and outage is None:
-                outage = {"start": stamp, "start_t": elapsed, "retries": 0}
+            if online is not False and outage is None:
+                outage = {"start": stamp, "start_t": elapsed, "retries": 0,
+                          "prior_unknown": online is None}
                 online = False
         elif WIFI_IP.search(line):
             if outage is not None:
@@ -179,8 +182,16 @@ def main():
     if not rows:
         sys.exit("no logger lines within the requested window")
 
-    reset_events = analyze_resets(rows)
-    wifi_events = analyze_wifi(rows)
+    # Stateful detectors run on the whole log so the window boundary cannot
+    # hide a disconnect (state was already online) or a reset (the prior
+    # uptime lies just before the window); events are then window-filtered.
+    def in_window(stamp):
+        return selected_start <= parse_utc(stamp) <= selected_end
+
+    reset_events = [e for e in analyze_resets(full_rows) if in_window(e["stamp"])]
+    wifi_events = [e for e in analyze_wifi(full_rows)
+                   if parse_utc(e["start"]) <= selected_end
+                   and (e["end"] is None or parse_utc(e["end"]) >= selected_start)]
     counts = {k: 0 for k in P}
     resets, stacks, keyboards, firmware, notes, port_events = [], [], [], {}, [], []
     sntp_times, blocks, diags = [], [], []
@@ -209,7 +220,9 @@ def main():
             elif key == "sntp":
                 sntp_times.append(t)
             elif key == "diag":
-                diags.append(dict(zip(DIAG_FIELDS, map(int, m.groups()))))
+                diag = dict(zip(DIAG_FIELDS, map(int, m.groups())))
+                diag["stamp"], diag["t"] = stamp, t
+                diags.append(diag)
         if BLOCK_START.search(text):
             blocks.append([(s, x) for s, _, x in rows[i:i + args.context]])
         i += 1
@@ -243,8 +256,16 @@ def main():
     print(f"Wi-Fi outage events: {len(wifi_events)}")
     for event in wifi_events:
         status = (f"recovered {event['end']}, duration {hms(event['duration_s'])}"
-                  if event["end"] else "NOT RECOVERED IN WINDOW")
-        print(f"  Wi-Fi outage started {event['start']}; {status}; retries {event['retries']}")
+                  if event["end"] else "NOT RECOVERED BY END OF LOG")
+        if event["end"] and parse_utc(event["end"]) > selected_end:
+            status += " (after window end)"
+        flags = []
+        if parse_utc(event["start"]) < selected_start:
+            flags.append("began before window")
+        if event["prior_unknown"]:
+            flags.append("state before first disconnect unknown")
+        extra = f" [{'; '.join(flags)}]" if flags else ""
+        print(f"  Wi-Fi outage started {event['start']}; {status}; retries {event['retries']}{extra}")
     print(f"DHCP acquired: {counts['dhcp']}   retry/backoff: {counts['retry']}   "
           f"SNTP confirmations: {counts['sntp']}   unconfigured: {counts['no_saved']}")
     if len(sntp_times) > 1:
@@ -256,6 +277,21 @@ def main():
     print(f"touch I2C errors: {counts['touch_err']}   LCD flush failures: {counts['lcd_err']}")
     print(f"memory diagnostic samples: {len(diags)}")
     if diags:
+        # DIAG is hourly from the LVGL-owning loop: a missing sample means the
+        # loop stalled, the board reset uncaptured, or telemetry is disabled.
+        last_gap = t_last - diags[-1]["t"]
+        print(f"  latest sample: {diags[-1]['stamp']} ({hms(last_gap)} before window end)")
+        if last_gap > DIAG_PERIOD_S + DIAG_SLACK_S:
+            print("  WARNING: DIAG STALE; values below are not current")
+        boot_starts = [0] + [n for n in range(1, len(diags))
+                             if diags[n]["uptime_s"] < diags[n - 1]["uptime_s"]]
+        gaps = [diags[n]["t"] - diags[n - 1]["t"] for n in range(1, len(diags))
+                if n not in boot_starts]
+        if gaps and max(gaps) > DIAG_PERIOD_S + DIAG_SLACK_S:
+            print(f"  WARNING: DIAG interval up to {hms(max(gaps))} within one boot (expected 1h)")
+        if len(boot_starts) > 1:
+            print(f"  samples span {len(boot_starts)} boots; trends below cover the latest boot only")
+            diags = diags[boot_starts[-1]:]
         for field in ("internal_free_b", "internal_min_b", "psram_free_b",
                       "psram_min_b", "main_stack_hwm_b", "network_stack_hwm_b"):
             vals = [d[field] for d in diags
