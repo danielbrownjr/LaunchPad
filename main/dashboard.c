@@ -41,6 +41,12 @@ static lv_obj_t *label_at(lv_obj_t *parent, const char *value, int x, int y,
     return label;
 }
 
+static void label_if_changed(lv_obj_t *label, const char *value)
+{
+    if (strcmp(lv_label_get_text(label), value) != 0)
+        lv_label_set_text(label, value);
+}
+
 static lv_obj_t *card_at(lv_obj_t *parent, int x, int y, int width, int height,
                           uint32_t background)
 {
@@ -61,23 +67,21 @@ void lp_dashboard_update_clock(void)
 {
     if (!s_clock_label) return;
     if (!lp_network_clock_valid()) {
-        lv_label_set_text(s_clock_label, "--:--");
-        lv_label_set_text(s_clock_status, "CLOCK NOT SET");
-        lv_label_set_text(s_clock_detail, "Waiting for NTP sync");
+        label_if_changed(s_clock_label, "--:--");
+        label_if_changed(s_clock_status, "CLOCK NOT SET");
+        label_if_changed(s_clock_detail, "Waiting for NTP sync");
         return;
     }
 
     char formatted[20];
     if (!lp_clock_format(time(NULL), formatted, sizeof(formatted))) return;
-    if (strcmp(lv_label_get_text(s_clock_label), formatted) != 0)
-        lv_label_set_text(s_clock_label, formatted);
+    label_if_changed(s_clock_label, formatted);
     const char *status;
     if (lp_network_clock_stale()) status = "LAST SYNC >24H";
     else if (lp_network_state() == LP_NET_SYNCED) status = "TIME SYNCED";
     else status = "OFFLINE TIME";
-    if (strcmp(lv_label_get_text(s_clock_status), status) != 0)
-        lv_label_set_text(s_clock_status, status);
-    lv_label_set_text(s_clock_detail, "Eastern time / automatic DST");
+    label_if_changed(s_clock_status, status);
+    label_if_changed(s_clock_detail, "Eastern time / automatic DST");
 }
 
 void lp_dashboard_set_network_state(lp_net_state_t state)
@@ -98,7 +102,7 @@ void lp_dashboard_set_network_state(lp_net_state_t state)
     }
     char text[100];
     (void)snprintf(text, sizeof(text), "NETWORK: %s  |  SCHEDULE STATE ABOVE", net);
-    lv_label_set_text(s_footer, text);
+    label_if_changed(s_footer, text);
 }
 
 void lp_dashboard_update_agenda(void)
