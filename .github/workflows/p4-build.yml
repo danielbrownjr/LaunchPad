@@ -34,6 +34,11 @@ jobs:
           cc -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -I main \
              main/wifi_text.c tests/test_wifi_text.c -o /tmp/launchpad-wifi-text-test
           /tmp/launchpad-wifi-text-test
+      - name: Native agenda model and source-selection tests
+        run: |
+          cc -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -I main \
+             main/agenda_model.c tests/test_agenda_model.c -o /tmp/launchpad-agenda-test
+          /tmp/launchpad-agenda-test
       - name: ESP-IDF v6.0.3 / ESP32-P4 build
         uses: espressif/esp-idf-ci-action@v1
         with:
