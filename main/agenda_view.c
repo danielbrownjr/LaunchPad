@@ -114,7 +114,8 @@ bool lp_agenda_vm_build(const lp_agenda_store_state_t *store,
     out->network_online = network_online;
     clock_valid = clock_valid && now_utc >= (int64_t)LP_CLOCK_MIN_EPOCH;
 
-    if (store->provider > LP_AGENDA_PROVIDER_FETCH_ERROR ||
+    if (store->provider < LP_AGENDA_PROVIDER_NO_DATA ||
+        store->provider > LP_AGENDA_PROVIDER_FETCH_ERROR ||
         (store->provider == LP_AGENDA_PROVIDER_OK && !store->has_snapshot) ||
         (store->provider == LP_AGENDA_PROVIDER_NO_DATA && store->has_snapshot)) {
         invalidate(out);
@@ -205,6 +206,7 @@ bool lp_agenda_vm_build(const lp_agenda_store_state_t *store,
         else if (item->ends_at_utc <= now_utc) tag = "DONE";
         else if (item->starts_at_utc <= now_utc) tag = "NOW";
         else if (i == hero) tag = "NEXT";
+        else if (i == then) tag = "THEN";
         else tag = "LATER";
         (void)strcpy(row->tag, tag);
         ++out->row_count;
@@ -228,7 +230,8 @@ bool lp_agenda_vm_build(const lp_agenda_store_state_t *store,
             (void)snprintf(out->hero_hint, sizeof(out->hero_hint),
                            "NOW UNTIL %s", end_clock);
         } else {
-            int64_t minutes = (item->starts_at_utc - now_utc + 59) / 60;
+            const int64_t delta = item->starts_at_utc - now_utc;
+            int64_t minutes = delta / 60 + (delta % 60 != 0);
             if (minutes <= 1) (void)strcpy(out->hero_hint, "STARTS SOON");
             else if (minutes <= 9999)
                 (void)snprintf(out->hero_hint, sizeof(out->hero_hint),
