@@ -268,6 +268,43 @@ class SoakTools(unittest.TestCase):
         self.assertLess(LOGGER.index("port.dtr = False"), LOGGER.index("port.open()"))
         self.assertLess(LOGGER.index("port.rts = False"), LOGGER.index("port.open()"))
 
+    def test_firmware_diag_format_matches_real_summarizer(self):
+        """Render the *actual C format* with sample numbers and parse it.
+
+        This catches field renames, added/removed fields and capture-order
+        drift between app_main's ESP_LOGI and the host log summarizer.
+        CI checks out the current PR merge with main, which contains firmware
+        from #43; no hard-coded test-only DIAG template is used here.
+        """
+        main_c = (ROOT / "main/main.c").read_text(encoding="utf-8")
+        match = re.search(
+            r'ESP_LOGI\\(TAG,\\s*"DIAG uptime_s=%"\\s*PRId64'
+            r'(?P<suffix>.*?)\\s*,\\s*uptime_s\\s*,',
+            main_c, re.DOTALL,
+        )
+        self.assertIsNotNone(match, "firmware DIAG format not found")
+        # PRId64 is the integer width macro for the first field. All
+        # remaining fields currently use decimal %u.
+        pieces = re.findall(r'"([^"]*)"', match.group("suffix"))
+        firmware_format = "DIAG uptime_s=%u" + "".join(pieces)
+        field_names = re.findall(r"([a-z][a-z0-9_]*)=%u", firmware_format)
+
+        summary = load_summarizer()
+        self.assertEqual(field_names, list(summary.DIAG_FIELDS))
+        self.assertEqual(firmware_format.count("%u"), len(summary.DIAG_FIELDS))
+        sample = tuple(range(101, 101 + len(field_names)))
+        rendered = firmware_format % sample
+        captured = summary.P["diag"].fullmatch(rendered)
+        self.assertIsNotNone(captured, "host DIAG regex rejected firmware output")
+        self.assertEqual(tuple(map(int, captured.groups())), sample)
+
+    def test_combined_soak_docs_keep_both_workstreams(self):
+        docs = (ROOT / "docs/firmware/stability-soak.md").read_text(encoding="utf-8")
+        self.assertIn("Window-scoped analysis (issue #41)", docs)
+        self.assertIn("Credential persistence diagnostic events", docs)
+        self.assertIn("the full log", docs)
+        self.assertIn("sta ip:", docs)
+
     def test_ci_retains_elf_for_backtrace_decoding(self):
         workflow = (ROOT / ".github/workflows/p4-build.yml").read_text(encoding="utf-8")
         self.assertIn("build/launchpad.elf", workflow)
