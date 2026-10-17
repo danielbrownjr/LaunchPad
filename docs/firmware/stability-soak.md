@@ -39,9 +39,12 @@ soak, do not tap **Save & connect** or **Forget saved**: both write NVS.
   worker watermark of zero is **unknown**, not a stack exhaustion.
   No separate LVGL task exists, so do not report one.
 - To disable this low-rate diagnostic stream in a separate firmware build,
-  define `LP_SOAK_TELEMETRY_ENABLED=0` at compilation. Logs do not reveal
-  passwords, SSIDs, or IP addresses. The diagnostic recorder creates no
-  separate FreeRTOS task or heap buffers.
+  define `LP_SOAK_TELEMETRY_ENABLED=0` at compilation. The `DIAG` and Wi-Fi
+  event lines contain no passwords, SSIDs or IP addresses, but the full log
+  is **not** free of network identifiers: ESP-IDF's `esp_netif_handlers` prints
+  `sta ip:`, `mask:` and `gw:` on every DHCP lease. Keep raw logs private and
+  publish only `--redact` output after reading it. The diagnostic recorder
+  creates no separate FreeRTOS task or heap buffers.
 - A single snapshot or a short session cannot establish long-term memory
   stability. Time-separated samples, stack margin acceptance criteria, and
   a controlled target-hardware run are still required.
