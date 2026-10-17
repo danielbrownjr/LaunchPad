@@ -71,6 +71,14 @@ class AgendaUiContract(unittest.TestCase):
         self.assertIn("const uint32_t swatches[]", DASH)
         self.assertIn("LV_SYMBOL_SETTINGS", WIFI)
 
+    def test_long_text_truncates_on_one_line(self):
+        # LV_LABEL_LONG_MODE_DOTS only truncates a fixed-height label; with
+        # content height a 48-byte label wraps over the next line (seen in a
+        # headless LVGL 9.4 render of the agenda rows and home preview).
+        text_at = re.search(r"static lv_obj_t \*text_at\(.*?\n\}", UI, flags=re.S).group(0)
+        self.assertIn("LV_LABEL_LONG_MODE_DOTS", text_at)
+        self.assertIn("lv_obj_set_size(label, width, lv_font_get_line_height(font))", text_at)
+
     def test_fixed_geometry_inside_screen(self):
         # All top-level cards/overlays remain in the 800x480 viewport.
         for x, y, width, height in re.findall(

@@ -47,7 +47,9 @@ static lv_obj_t *text_at(lv_obj_t *parent, const char *initial, int x, int y,
 {
     lv_obj_t *label = lv_label_create(parent);
     lv_obj_set_pos(label, x, y);
-    lv_obj_set_width(label, width);
+    /* DOTS only truncates with a fixed height; with content height a long
+     * label wraps and overprints the line below it. One line per label. */
+    lv_obj_set_size(label, width, lv_font_get_line_height(font));
     lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_set_style_text_color(label, lv_color_hex(color), 0);
