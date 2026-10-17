@@ -72,11 +72,58 @@ def open_port(name, baud):
     port = serial.Serial()
     port.port = name
     port.baudrate = baud
-    port.timeout = 0.5
+    port.timeout = 0.15  # shorter read latency during reconnect
     port.dtr = False  # set BEFORE open: avoids the USB-JTAG reset sequence
     port.rts = False
     port.open()
     return port
+
+
+class PortOutage:
+    """Bounded diagnostics for an unavailable serial port."""
+
+    def __init__(self):
+        self.started = None
+        self.last_report = None
+        self.attempts = 0
+
+    def lost(self, now):
+        if self.started is None:
+            self.started = now
+
+    def unavailable(self, now, kind):
+        if self.started is None:
+            self.started = now
+        self.attempts += 1
+        if self.last_report is None:
+            self.last_report = now
+            return f"#LOGGER port-unavailable {kind}"
+        if now - self.last_report >= 60:
+            self.last_report = now
+            return (f"#LOGGER port-unavailable gap_s={now - self.started:.1f}"
+                    f" attempts={self.attempts}")
+        return None
+
+    def opened(self, now):
+        if self.started is None:
+            return None
+        event = (f"#LOGGER port-recovered gap_s={now - self.started:.3f}"
+                 f" attempts={self.attempts}")
+        self.started = self.last_report = None
+        self.attempts = 0
+        return event
+
+
+def reconnect_interval(seconds_missing):
+    return 0.1 if seconds_missing < 10 else 1.0
+
+
+def flush_partial(log, pending, reason):
+    """An interrupted line must not join bytes from another port session."""
+    if pending:
+        log.write(f"#LOGGER partial-line {reason} bytes={len(pending)}")
+        log.write("#PARTIAL " + pending.decode("utf-8", "replace"))
+    return b""
 
 
 def note_reader(notes):
@@ -109,6 +156,7 @@ def main():
     lines_seen = 0
     last_rx = time.monotonic()
     silence_reported = False
+    outage = PortOutage()
     try:
         while True:
             while not notes.empty():
@@ -116,24 +164,32 @@ def main():
             if port is None:
                 try:
                     port = open_port(args.port, args.baud)
+                    now = time.monotonic()
+                    restored = outage.opened(now)
+                    if restored:
+                        log.write(restored)
                     log.write("#LOGGER port-open")
-                    last_rx = time.monotonic()
+                    pending = b""
+                    last_rx = now
                 except (serial.SerialException, OSError) as exc:
-                    log.write(f"#LOGGER port-unavailable {type(exc).__name__}")
-                    time.sleep(2.0)
+                    now = time.monotonic()
+                    event = outage.unavailable(now, type(exc).__name__)
+                    if event:
+                        log.write(event)
+                    time.sleep(reconnect_interval(now - outage.started))
                     continue
             try:
                 chunk = port.read(4096)
             except (serial.SerialException, OSError) as exc:
+                now = time.monotonic()
                 log.write(f"#LOGGER port-lost {type(exc).__name__}")
+                pending = flush_partial(log, pending, "port-lost")
+                outage.lost(now)
                 try:
                     port.close()
                 except Exception:
                     pass
                 port = None
-                if pending:
-                    log.write(pending.decode("utf-8", "replace"))
-                    pending = b""
                 continue
             now = time.monotonic()
             if chunk:
@@ -141,6 +197,8 @@ def main():
                 silence_reported = False
                 pending += chunk
                 *complete, pending = re.split(rb"\r?\n", pending)
+                if len(pending) > 65536:
+                    pending = flush_partial(log, pending, "overlong")
                 for raw in complete:
                     text = raw.decode("utf-8", "replace").rstrip("\r")
                     log.write(text)
@@ -155,8 +213,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        if pending:
-            log.write(pending.decode("utf-8", "replace"))
+        pending = flush_partial(log, pending, "shutdown")
         log.write(f"#LOGGER stop lines={lines_seen}")
         log.close()
         if port is not None:

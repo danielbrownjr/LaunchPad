@@ -23,6 +23,50 @@ py tools/soak_summarize.py <raw.log> --redact > summary-redacted.txt
 Keep raw logs private. Never type passwords, SSIDs or IPs as notes. During a
 soak, do not tap **Save & connect** or **Forget saved**: both write NVS.
 
+### Window-scoped analysis (issue #41)
+
+Summarize an actual acceptance interval rather than including keyboard exercises
+and network setup from before the soak. All window timestamps must include
+`Z` or an explicit timezone offset; this example uses UTC:
+
+```
+py tools/soak_summarize.py <raw.log> --redact \
+  --from 2026-10-17T00:10:39Z --to 2026-10-17T12:10:39Z
+```
+
+The summary separately displays the complete **instrumented log span** and
+the selected **window**. It warns when the requested interval begins before
+the first log entry or finishes after the last captured line. Such windows
+are **incomplete evidence**, even when operator observations bridge the gap.
+
+The summarizer detects an ESP-IDF reboot from a captured `rst:` banner and
+from substantial backwards movement of its `I (uptime_ms)`-style log
+timestamps; it reports whether a preceding USB loss was seen. Opening a
+read-only serial port is **not** evidence that the monitor caused a reset.
+Wi-Fi outages are grouped from the first disconnect through renewed DHCP,
+with duplicate disconnect messages suppressed and retries counted. Reset and
+Wi-Fi state are tracked across the **whole** log and then filtered to the
+window, so connectivity established before `--from` cannot hide an outage
+inside it. An outage overlapping the window start is marked
+`began before window`; a disconnect before any logged connectivity is marked
+`state before first disconnect unknown`.
+
+`DIAG` trends cover the latest boot only when samples span a reset. The
+summary prints the latest sample's age and warns `DIAG STALE` when it is
+more than 65 minutes before the window end, or when two samples within one
+boot are more than 65 minutes apart. Either can mean a stalled LVGL loop, an
+uncaptured reset, or telemetry disabled at build time.
+
+The logger retries reconnecting every 100 ms for the first 10 seconds of an
+unavailable port, then once per second. It reports the first failed open and
+at most one progress event per minute rather than flooding the log, then
+reports outage duration on reconnect. Interrupted receive fragments are
+logged as separate `#PARTIAL` records, never joined across port sessions.
+USB re-enumeration can still prevent recovery of the earliest ROM/ELF
+banner regardless of reconnect interval. Its success rate is **untested on
+the actual Windows board** and needs controlled operator testing.
+
+
 ## What this image can and cannot show
 
 - Task watchdog output (starved task, running task per CPU, backtrace) is
