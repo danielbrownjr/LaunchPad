@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 
+#include "agenda_store.h"
 #include "board.h"
 #include "dashboard.h"
 #include "esp_err.h"
@@ -111,6 +112,13 @@ void app_main(void)
     ESP_LOGI(TAG, "PSRAM detected: %u bytes", (unsigned)psram);
     if (psram != 32U * 1024U * 1024U) {
         ESP_LOGW(TAG, "Expected 32 MiB PSRAM from module marking; actual size differs");
+    }
+
+    /* Reserve the provider-neutral agenda store during single-task startup.
+     * A failed mutex allocation must not prevent clock/network diagnostics;
+     * future providers will receive a false return from publish/read. */
+    if (!lp_agenda_store_init()) {
+        ESP_LOGE(TAG, "Agenda store unavailable; future schedule feed disabled");
     }
 
     esp_lcd_panel_handle_t panel = NULL;
