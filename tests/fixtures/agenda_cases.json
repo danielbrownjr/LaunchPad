@@ -1,0 +1,549 @@
+{
+  "fixture_version": 1,
+  "description": "All appointments and locations are fictional. Reserved bridge case is a synthetic test of freshness only.",
+  "as_of": "2026-10-17T12:00:00Z",
+  "cases": [
+    {
+      "name": "zero",
+      "expected_valid": true,
+      "expected_next": null,
+      "expected_view": "DEMO",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": []
+      }
+    },
+    {
+      "name": "one",
+      "expected_valid": true,
+      "expected_next": "demo-a",
+      "expected_view": "DEMO",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "demo-a",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unordered_with_cancelled",
+      "expected_valid": true,
+      "expected_next": "demo-early",
+      "expected_view": "DEMO",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "demo-late",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T19:00:00Z",
+            "ends_at": "2026-10-17T20:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-cancel",
+            "status": "cancelled",
+            "starts_at": "2026-10-17T13:00:00Z",
+            "ends_at": "2026-10-17T14:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-early",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:00:00Z",
+            "ends_at": "2026-10-17T15:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "overlap_deterministic",
+      "expected_valid": true,
+      "expected_next": "demo-a",
+      "expected_view": "DEMO",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "demo-b",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:00:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-a",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:00:00Z",
+            "ends_at": "2026-10-17T15:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "cross_midnight_offset",
+      "expected_valid": true,
+      "expected_next": "demo-night",
+      "expected_view": "DEMO",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "demo-night",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T23:30:00-04:00",
+            "ends_at": "2026-10-18T01:30:00-04:00",
+            "label": "Fictional late service",
+            "location_label": "Mocksville, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unscheduled_and_past",
+      "expected_valid": true,
+      "expected_next": null,
+      "expected_view": "DEMO",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "demo-unscheduled",
+            "status": "unscheduled",
+            "starts_at": null,
+            "ends_at": null,
+            "label": "Tentative fictional call",
+            "location_label": ""
+          },
+          {
+            "id": "demo-past",
+            "status": "scheduled",
+            "starts_at": "2026-10-16T09:00:00Z",
+            "ends_at": "2026-10-16T10:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "stale_bridge_not_real",
+      "expected_valid": true,
+      "expected_next": "demo-a",
+      "expected_view": "STALE",
+      "wire": {
+        "schema_version": 1,
+        "source": "bridge",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T09:00:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "demo-a",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_offsetless",
+      "expected_valid": false,
+      "expected_next": null,
+      "expected_view": "INVALID",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "bad-a",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_too_many",
+      "expected_valid": false,
+      "expected_next": null,
+      "expected_view": "INVALID",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "demo-0",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-1",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-2",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-3",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-4",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-5",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-6",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-7",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-8",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_duplicate_id",
+      "expected_valid": false,
+      "expected_next": null,
+      "expected_view": "INVALID",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "dup",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "dup",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T18:30:00Z",
+            "ends_at": "2026-10-17T19:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_label_bytes",
+      "expected_valid": false,
+      "expected_next": null,
+      "expected_view": "INVALID",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "too-long",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_unpaired_surrogate",
+      "expected_valid": false,
+      "expected_next": null,
+      "expected_view": "INVALID",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "bad-utf8",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "\ud800",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid_unknown_schema",
+      "expected_valid": false,
+      "expected_next": null,
+      "expected_view": "INVALID",
+      "wire": {
+        "schema_version": 2,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": []
+      }
+    },
+    {
+      "name": "invalid_unknown_field",
+      "expected_valid": false,
+      "expected_next": null,
+      "expected_view": "INVALID",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [],
+        "unexpected_field": true
+      }
+    },
+    {
+      "name": "current_bridge_in_progress",
+      "expected_valid": true,
+      "expected_next": "demo-ongoing",
+      "expected_view": "CURRENT",
+      "wire": {
+        "schema_version": 1,
+        "source": "bridge",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "demo-later",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T13:00:00Z",
+            "ends_at": "2026-10-17T14:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-ongoing",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T11:30:00Z",
+            "ends_at": "2026-10-17T12:30:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "no_jobs_bridge",
+      "expected_valid": true,
+      "expected_next": null,
+      "expected_view": "NO_JOBS",
+      "wire": {
+        "schema_version": 1,
+        "source": "bridge",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "demo-past",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T09:00:00Z",
+            "ends_at": "2026-10-17T10:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-cancel",
+            "status": "cancelled",
+            "starts_at": "2026-10-17T13:00:00Z",
+            "ends_at": "2026-10-17T14:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          },
+          {
+            "id": "demo-unscheduled",
+            "status": "unscheduled",
+            "starts_at": null,
+            "ends_at": null,
+            "label": "Tentative fictional call",
+            "location_label": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "future_generated_bridge",
+      "expected_valid": true,
+      "expected_next": "demo-a",
+      "expected_view": "INVALID",
+      "wire": {
+        "schema_version": 1,
+        "source": "bridge",
+        "generated_at": "2026-10-17T12:10:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "demo-a",
+            "status": "scheduled",
+            "starts_at": "2026-10-17T14:30:00Z",
+            "ends_at": "2026-10-17T16:00:00Z",
+            "label": "Example instrument visit",
+            "location_label": "Sampletown, MA"
+          }
+        ]
+      }
+    },
+    {
+      "name": "dst_fall_back_repeated_hour",
+      "expected_valid": true,
+      "expected_next": "demo-dst-first",
+      "expected_view": "DEMO",
+      "wire": {
+        "schema_version": 1,
+        "source": "demo",
+        "generated_at": "2026-10-17T12:00:00Z",
+        "source_checked_at": "2026-10-17T11:59:00Z",
+        "time_zone": "America/New_York",
+        "ttl_seconds": 3600,
+        "appointments": [
+          {
+            "id": "demo-dst-second",
+            "status": "scheduled",
+            "starts_at": "2026-11-01T01:10:00-05:00",
+            "ends_at": "2026-11-01T01:40:00-05:00",
+            "label": "Fictional early check",
+            "location_label": "Mocksville, MA"
+          },
+          {
+            "id": "demo-dst-first",
+            "status": "scheduled",
+            "starts_at": "2026-11-01T01:30:00-04:00",
+            "ends_at": "2026-11-01T01:50:00-04:00",
+            "label": "Fictional overnight visit",
+            "location_label": "Mocksville, MA"
+          }
+        ]
+      }
+    }
+  ]
+}
