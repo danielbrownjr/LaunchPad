@@ -4,6 +4,7 @@
  * Only bounded, nonblocking requests go to the network worker.
  */
 #include "wifi_ui.h"
+#include "dashboard.h"
 #include "network.h"
 #include "credentials.h"
 #include "wifi_keyboard.h"
@@ -233,6 +234,12 @@ static void render_scan(void)
     }
 }
 
+static void diagnostics_pressed(lv_event_t *event)
+{
+    (void)event;
+    lp_dashboard_open_diagnostics();
+}
+
 static void create_panel(lv_obj_t *root)
 {
     s_ui.panel = lv_obj_create(root);
@@ -265,6 +272,8 @@ static void create_panel(lv_obj_t *root)
     button(s_ui.list_page, "Scan", 12, 287, 128, 40, scan_pressed);
     button(s_ui.list_page, "Manual SSID", 153, 287, 182, 40, manual_ssid);
     button(s_ui.list_page, "Forget saved", 350, 287, 170, 40, forget_pressed);
+    button(s_ui.list_page, "Diagnostics", 535, 287, 158, 40,
+           diagnostics_pressed);
 
     s_ui.form_page = lv_obj_create(s_ui.panel);
     lv_obj_set_pos(s_ui.form_page, 10, 52);
