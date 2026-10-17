@@ -58,6 +58,43 @@ are no longer on the home view. Settings (existing gear) now includes a
 status, the RGB fixture, and touch counter. This change does not alter
 Wi-Fi provisioning, password masking, NVS storage, scans or the C5 driver.
 
+## LVGL 9.4 rendering rules found in review
+
+These were reproduced with a headless LVGL 9.4.0 host render of the real
+dashboard, agenda and Wi-Fi UI sources:
+
+- **Single-line labels need a fixed height.** `LV_LABEL_LONG_MODE_DOTS` only
+  truncates a fixed-height label. With content height, a 48-byte title
+  wraps and overprints the location line. `text_at()` sizes each label to
+  one font line.
+- **DOTS rewrites the label's stored text.** `lv_label_get_text()` returns
+  the truncated `...` form, so a text comparison never matches a truncated
+  label. `lp_agenda_ui_apply()` therefore returns early when the view model
+  is byte-identical to the last applied one. The S3 builder zero-fills the
+  view first, which keeps that comparison exact. In the harness, an
+  unchanged schedule then produced no flushes over 10 seconds, where it
+  produced 50 before.
+- **Hiding rows does not clamp the scroll offset.** A list scrolled to the
+  bottom of 8 rows showed nothing after an update to 2 rows. The list
+  returns to the top when the agenda opens and when the row count changes.
+- **Empty wording follows the state.** "No appointments scheduled" appears
+  only for an accepted CURRENT, NO_JOBS or DEMO schedule. Missing, rejected,
+  unsynchronized or failed data says so instead.
+- **Settings raises itself** when opened, because the agenda overlay does.
+
+The LVGL built-in heap on the device is 64 KiB (`work_mem_int`). With every
+screen created (home, agenda, Settings, keyboard and Diagnostics), the
+64-bit host build peaked at 52.7 KB. Usage stayed flat across 50
+open/close cycles. The 32-bit device uses less, but should report
+`lv_mem_monitor()` before more UI is added.
+
+Unicode: the built-in Montserrat 14/20/40 fonts contain only U+0020-U+007F,
+`°` and `•`, so `é`, `ü`, `ã` and `—` render as placeholder boxes. Adding
+U+00A0-U+00FF to subset fonts is estimated at about 5 KB at 14 px and 9 KB
+at 20 px. The 40 px clock needs digits only. This fits the 62 KiB left in the
+factory partition, but belongs in its own font change. Until then, real
+non-ASCII labels are not acceptable for display.
+
 ## Tests / required acceptance
 
 - Native S3 view-model tests remain the truth/policy gate.
