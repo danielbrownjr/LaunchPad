@@ -92,11 +92,13 @@ static void test_midnight_and_expiry(void)
     lp_agenda_snapshot_t data = fixture();
     /* UTC selection works without assuming 24 h wall days. The timezone
      * conversion/DST behavior is tested separately in clock_util. */
-    data.items[0].starts_at_utc = FIXED_NOW + 86340;
-    data.items[0].ends_at_utc = FIXED_NOW + 86640;
+    const int64_t next_utc_midnight =
+        FIXED_NOW - FIXED_NOW % 86400 + 86400;
+    data.items[0].starts_at_utc = next_utc_midnight - 60;
+    data.items[0].ends_at_utc = next_utc_midnight + 240;
     size_t index = 99;
-    assert(lp_agenda_next(&data, FIXED_NOW + 86460, &index) && index == 0);
-    assert(!lp_agenda_next(&data, FIXED_NOW + 86640, &index));
+    assert(lp_agenda_next(&data, next_utc_midnight + 60, &index) && index == 0);
+    assert(!lp_agenda_next(&data, next_utc_midnight + 240, &index));
 
     data.source = LP_AGENDA_SOURCE_BRIDGE;
     data.items[0].starts_at_utc = FIXED_NOW + 100;
