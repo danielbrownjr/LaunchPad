@@ -46,7 +46,7 @@ P = {
     "wdt": re.compile(r"Task watchdog got triggered"),
     "panic": re.compile(r"Guru Meditation|abort\(\) was called|Stack smashing|stack overflow|assert failed"),
 }
-UPTIME = re.compile(r"^[IWEVD] \\((\\d+)\\)")
+UPTIME = re.compile(r"^[IWEVD] \((\d+)\)")
 WIFI_DOWN = re.compile(r"Station mode: Disconnected")
 WIFI_UP = re.compile(r"Station mode: Connected|DHCP IP acquired")
 WIFI_IP = re.compile(r"DHCP IP acquired")
