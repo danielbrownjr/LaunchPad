@@ -51,6 +51,8 @@ SAMPLE = [
     "W (20001) wifi: connected with Example Net, aid = 1, bssid aa:bb:cc:dd:ee:ff, ip 10.0.0.7",
     "MEPC    : 0x4800abcd  RA      : 0x4800a0f0",
     "I (3604000) lp_net: SNTP UTC synchronization confirmed",
+    "I (3605000) launchpad: DIAG uptime_s=3605 internal_free_b=32000 internal_min_b=31000 psram_free_b=1800000 psram_min_b=1700000 main_stack_hwm_b=7504 network_stack_hwm_b=5300 network_sample_age_s=5 network_valid=1",
+    "I (7205000) launchpad: DIAG uptime_s=7205 internal_free_b=30000 internal_min_b=29000 psram_free_b=1780000 psram_min_b=1600000 main_stack_hwm_b=7460 network_stack_hwm_b=5200 network_sample_age_s=8 network_valid=1",
 ]
 
 
@@ -92,6 +94,14 @@ class SoakTools(unittest.TestCase):
         self.assertIn("MEPC    : 0x4800abcd  RA      : 0x4800a0f0", text)
         self.assertIn("IDLE0 (CPU 0)", text)
 
+
+    def test_memory_diagnostic_trends(self):
+        text = self.summarize()
+        self.assertIn("memory diagnostic samples: 2", text)
+        self.assertIn("internal_free_b: first=32000 last=30000", text)
+        self.assertIn("network_stack_hwm_b: first=5300 last=5200", text)
+        self.assertIn("network worker sample age (s): max=8", text)
+        self.assertIn("not proof of memory stability", text)
 
     def test_uptime_reset_without_boot_banner(self):
         module = load_summarizer()
