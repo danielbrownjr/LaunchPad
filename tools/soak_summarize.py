@@ -44,10 +44,10 @@ P = {
     "touch_err": re.compile(r"Touch I2C error"),
     "lcd_err": re.compile(r"LCD flush failed"),
     "diag": re.compile(
-        r"DIAG uptime_s=(\\d+) internal_free_b=(\\d+) internal_min_b=(\\d+)"
-        r" psram_free_b=(\\d+) psram_min_b=(\\d+) main_stack_hwm_b=(\\d+)"
-        r" network_stack_hwm_b=(\\d+) network_sample_age_s=(\\d+)"
-        r" network_valid=(\\d+)"
+        r"DIAG uptime_s=(\d+) internal_free_b=(\d+) internal_min_b=(\d+)"
+        r" psram_free_b=(\d+) psram_min_b=(\d+) main_stack_hwm_b=(\d+)"
+        r" network_stack_hwm_b=(\d+) network_sample_age_s=(\d+)"
+        r" network_valid=(\d+)"
     ),
     "wdt": re.compile(r"Task watchdog got triggered"),
     "panic": re.compile(r"Guru Meditation|abort\(\) was called|Stack smashing|stack overflow|assert failed"),
