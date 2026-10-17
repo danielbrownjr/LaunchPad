@@ -43,6 +43,12 @@ static ui_row_t s_rows[LP_AGENDA_MAX_ITEMS];
 static bool s_dim_initialized;
 static bool s_last_dim;
 static size_t s_last_row_count;
+/* LVGL 9 DOTS mode writes "..." into a truncated label's stored text, so
+ * comparing lv_label_get_text() never matches and would re-set (and redraw)
+ * every truncated label each second. The view model is zero-filled before
+ * it is built, so an unchanged view is detected exactly with memcmp. */
+static lp_agenda_vm_t s_applied;
+static bool s_applied_valid;
 
 static lv_obj_t *text_at(lv_obj_t *parent, const char *initial, int x, int y,
                          int width, uint32_t color, const lv_font_t *font)
@@ -212,6 +218,7 @@ static void show_preview(const lp_agenda_vm_t *view)
 void lp_agenda_ui_apply(const lp_agenda_vm_t *view)
 {
     if (!view || !s_hero_card) return;
+    if (s_applied_valid && memcmp(view, &s_applied, sizeof(*view)) == 0) return;
 
     update_text(s_banner, view->banner);
     update_text(s_source, view->source[0] ? view->source : "NO SOURCE");
@@ -264,4 +271,6 @@ void lp_agenda_ui_apply(const lp_agenda_vm_t *view)
     s_last_row_count = view->row_count;
     s_last_dim = view->dim_schedule;
     s_dim_initialized = true;
+    s_applied = *view;
+    s_applied_valid = true;
 }

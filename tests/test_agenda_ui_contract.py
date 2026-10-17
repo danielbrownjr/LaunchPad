@@ -79,6 +79,19 @@ class AgendaUiContract(unittest.TestCase):
         self.assertIn("LV_LABEL_LONG_MODE_DOTS", text_at)
         self.assertIn("lv_obj_set_size(label, width, lv_font_get_line_height(font))", text_at)
 
+    def test_unchanged_view_does_not_redraw(self):
+        # DOTS rewrites a truncated label's stored text, so comparing with
+        # lv_label_get_text() alone re-set and redrew it every second.
+        apply = UI[UI.index("void lp_agenda_ui_apply("):]
+        guard = apply.index("memcmp(view, &s_applied, sizeof(*view)) == 0) return;")
+        self.assertLess(guard, apply.index("update_text(s_banner"))
+        self.assertIn("s_applied = *view;", apply)
+        # Exact comparison relies on S3 zero-filling the whole view first.
+        view = (ROOT / "main/agenda_view.c").read_text(encoding="utf-8")
+        build = view[view.index("bool lp_agenda_vm_build("):]
+        self.assertLess(build.index("memset(out, 0, sizeof(*out));"),
+                        build.index("out->revision = store->revision;"))
+
     def test_agenda_list_never_keeps_a_stale_scroll_offset(self):
         # Hiding rows does not clamp LVGL's scroll offset: with 8 rows
         # scrolled to the bottom, a 2-row update showed an empty list.
