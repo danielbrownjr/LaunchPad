@@ -24,6 +24,7 @@ typedef struct {
 
 static lv_obj_t *s_hero_card;
 static lv_obj_t *s_banner;
+static lv_obj_t *s_source;
 static lv_obj_t *s_hero_time;
 static lv_obj_t *s_hero_label;
 static lv_obj_t *s_hero_location;
@@ -112,8 +113,10 @@ void lp_agenda_ui_create(lv_obj_t *root)
     /* Left clock lives in dashboard.c. The right-hand card and lower agenda
      * preview are exclusively controlled by this module. */
     s_hero_card = card_at(root, 307, 66, 469, 246, C_CARD);
-    s_banner = text_at(s_hero_card, "NO SCHEDULE DATA", 18, 12, 432,
+    s_banner = text_at(s_hero_card, "NO SCHEDULE DATA", 18, 12, 296,
                        C_WARNING, &lv_font_montserrat_14);
+    s_source = text_at(s_hero_card, "NO SOURCE", 318, 12, 135,
+                       C_MUTED, &lv_font_montserrat_14);
     s_hero_time = text_at(s_hero_card, "NO CONFIRMED NEXT STOP", 18, 47, 434,
                           C_TEXT, &lv_font_montserrat_20);
     s_hero_label = text_at(s_hero_card, "Waiting for fictional agenda", 18, 84,
@@ -201,6 +204,7 @@ void lp_agenda_ui_apply(const lp_agenda_vm_t *view)
     if (!view || !s_hero_card) return;
 
     update_text(s_banner, view->banner);
+    update_text(s_source, view->source[0] ? view->source : "NO SOURCE");
     update_text(s_detail_banner, view->banner);
     update_text(s_detail_source, view->source[0] ? view->source : "NO SOURCE");
     update_text(s_detail_freshness, view->freshness);
