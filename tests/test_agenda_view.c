@@ -180,7 +180,8 @@ static void test_bridge_stale_error_clock_and_no_jobs(void)
     store.snapshot.items[0].starts_at_utc = now - 3600;
     assert(lp_agenda_vm_build(&store, now, true, true, &vm));
     assert_banner(&vm, LP_AGENDA_SCREEN_NO_JOBS, "NO UPCOMING JOBS");
-    assert(!vm.has_hero && vm.row_count == 1);
+    assert(!vm.has_hero && vm.row_count == 1 && !vm.dim_schedule);
+    assert(strcmp(vm.rows[0].tag, "DONE") == 0);
 }
 
 static void test_dst_fallback_demo_vs_bridge_ttl(void)
