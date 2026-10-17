@@ -137,6 +137,34 @@ class BringupGuards(unittest.TestCase):
         self.assertLess(UI.index('if (!lp_network_clock_valid())'),
                         UI.index('if (lp_network_clock_stale())'))
 
+    def test_hourly_metrics_and_credential_free_wifi_events(self):
+        # The LVGL task is app_main; no fabricated separate LVGL task.
+        self.assertIn("#define LP_SOAK_DIAG_INTERVAL_S 3600", MAIN)
+        self.assertIn("#ifndef LP_SOAK_TELEMETRY_ENABLED", MAIN)
+        self.assertIn("heap_caps_get_free_size(MALLOC_CAP_INTERNAL", MAIN)
+        self.assertIn("heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL", MAIN)
+        self.assertIn("heap_caps_get_free_size(MALLOC_CAP_SPIRAM", MAIN)
+        self.assertIn("heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM", MAIN)
+        self.assertIn('main_stack_hwm_b=%u network_stack_hwm_b=%u', MAIN)
+        self.assertIn("network_sample_age_s=%u network_valid=%u", MAIN)
+        self.assertIn("lp_network_diag_snapshot()", MAIN)
+        self.assertIn("uxTaskGetStackHighWaterMark(NULL)", NETWORK)
+        self.assertIn("sample_worker_stack();", NETWORK)
+        self.assertIn("static atomic_bool s_worker_stack_valid", NETWORK)
+        for event in ("Wi-Fi save request queued",
+                      "Wi-Fi forget request queued",
+                      "Wi-Fi save committed to P4 NVS",
+                      "Wi-Fi forget persisted in P4 NVS"):
+            self.assertIn(f'ESP_LOGI(TAG, "{event}")', NETWORK)
+        # All diagnostic event markers have literal, fixed formats only.
+        for line in NETWORK.splitlines():
+            if 'ESP_LOGI(TAG, "Wi-Fi save' in line or 'ESP_LOGI(TAG, "Wi-Fi forget' in line:
+                self.assertNotIn("%", line)
+                self.assertNotIn("ssid", line.lower())
+                self.assertNotIn("password", line.lower())
+        self.assertNotIn("esp_restart()", MAIN)
+        self.assertNotIn("esp_restart()", NETWORK)
+
     def test_credentials_dhcp_and_trustworthy_clock(self):
         cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
         clock = (ROOT / "main/clock_util.c").read_text(encoding="utf-8")

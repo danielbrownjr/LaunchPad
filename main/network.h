@@ -51,6 +51,19 @@ lp_net_state_t lp_network_state(void);
 bool lp_network_clock_valid(void);
 bool lp_network_clock_stale(void);
 
+/* Network worker is separate from the LVGL-owning app_main task.
+ * Read-only snapshot of its self-measured minimum-ever free stack.
+ * available=false means the worker never sampled or has exited.
+ * sample_age_s expresses freshness, not stack usage.
+ */
+typedef struct {
+    uint32_t worker_stack_hwm_bytes;
+    uint32_t sample_age_s;
+    bool available;
+} lp_network_diag_t;
+
+lp_network_diag_t lp_network_diag_snapshot(void);
+
 /* Non-blocking, bounded cross-task commands. Never call driver/NVS from LVGL.
  * False = not ready, unsupported credentials or another action pending. */
 bool lp_network_request_scan(void);

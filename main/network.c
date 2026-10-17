@@ -44,6 +44,29 @@ static atomic_bool s_synced = ATOMIC_VAR_INIT(false);
 static atomic_uint s_last_sync_tick = ATOMIC_VAR_INIT(0);
 static bool s_sntp_started;
 
+/* Task self-reported high-water mark; no unsafe cross-task handle reads. */
+static atomic_uint s_worker_stack_hwm_bytes = ATOMIC_VAR_INIT(0);
+static atomic_uint s_worker_stack_sample_tick = ATOMIC_VAR_INIT(0);
+static atomic_bool s_worker_stack_valid = ATOMIC_VAR_INIT(false);
+
+static void sample_worker_stack(void)
+{
+    atomic_store(&s_worker_stack_hwm_bytes, (unsigned)uxTaskGetStackHighWaterMark(NULL));
+    atomic_store(&s_worker_stack_sample_tick, (unsigned)xTaskGetTickCount());
+    atomic_store(&s_worker_stack_valid, true);
+}
+
+lp_network_diag_t lp_network_diag_snapshot(void)
+{
+    lp_network_diag_t result = {0};
+    if (!atomic_load(&s_worker_stack_valid)) return result;
+    result.worker_stack_hwm_bytes = atomic_load(&s_worker_stack_hwm_bytes);
+    result.sample_age_s = (uint32_t)(xTaskGetTickCount()
+                         - atomic_load(&s_worker_stack_sample_tick)) / configTICK_RATE_HZ;
+    result.available = true;
+    return result;
+}
+
 typedef enum { CMD_NONE, CMD_SCAN, CMD_SAVE, CMD_FORGET } lp_cmd_kind_t;
 typedef struct {
     lp_cmd_kind_t kind;
@@ -137,7 +160,12 @@ static bool queue_action(lp_cmd_kind_t kind, const lp_credentials_t *creds)
         accepted = true;
     }
     portEXIT_CRITICAL(&s_command_lock);
-    if (accepted) xEventGroupSetBits(s_events, NET_ACTION);
+    if (accepted) {
+        /* Credential-free event markers, never log SSID/password. */
+        if (kind == CMD_SAVE) ESP_LOGI(TAG, "Wi-Fi save request queued");
+        if (kind == CMD_FORGET) ESP_LOGI(TAG, "Wi-Fi forget request queued");
+        xEventGroupSetBits(s_events, NET_ACTION);
+    }
     return accepted;
 }
 
@@ -418,6 +446,7 @@ static bool process_action(void)
         if (err == ESP_OK) {
             update_saved_ssid(request.credentials.ssid);
             atomic_store(&s_save_status, LP_SAVE_OK);
+            ESP_LOGI(TAG, "Wi-Fi save committed to P4 NVS");
             changed = true;
         } else {
             ESP_LOGE(TAG, "Failed saving Wi-Fi settings: %s", esp_err_to_name(err));
@@ -435,6 +464,7 @@ static bool process_action(void)
         if (err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND) {
             update_saved_ssid(NULL);
             atomic_store(&s_save_status, LP_SAVE_FORGOTTEN);
+            ESP_LOGI(TAG, "Wi-Fi forget persisted in P4 NVS");
             changed = true;
         } else {
             ESP_LOGE(TAG, "Failed forgetting Wi-Fi: %s", esp_err_to_name(err));
@@ -495,6 +525,7 @@ static void network_task(void *arg)
 
     unsigned attempts = 0;
     for (;;) {
+        sample_worker_stack();
         xEventGroupClearBits(s_events, NET_NEW_CONFIG);
         lp_credentials_t creds;
         bool found = false;
@@ -527,6 +558,7 @@ static void network_task(void *arg)
             if (err != ESP_OK) {
                 fail("Wi-Fi connect RPC", err);
             } else {
+                sample_worker_stack();
                 EventBits_t flags = xEventGroupWaitBits(
                     s_events, NET_IP | NET_DISCONNECT | NET_NEW_CONFIG | NET_ACTION,
                     pdTRUE, pdFALSE, pdMS_TO_TICKS(20000));
@@ -552,6 +584,7 @@ static void network_task(void *arg)
                         continue;
                     }
                     for (;;) {
+                        sample_worker_stack();
                         EventBits_t f = xEventGroupWaitBits(
                             s_events, NET_DISCONNECT | NET_NEW_CONFIG | NET_ACTION,
                             pdTRUE, pdFALSE, pdMS_TO_TICKS(5000));
@@ -589,6 +622,7 @@ static void network_task(void *arg)
     }
 
 done:
+    atomic_store(&s_worker_stack_valid, false);
     vTaskDelete(NULL);
 }
 
