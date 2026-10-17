@@ -137,7 +137,7 @@ class BringupGuards(unittest.TestCase):
         self.assertIn('if (lp_network_clock_stale()) status = "LAST SYNC >24H"', UI)
         self.assertIn('else if (lp_network_state() == LP_NET_SYNCED) status = "TIME SYNCED"', UI)
         self.assertIn('else status = "OFFLINE TIME"', UI)
-        self.assertIn("lv_label_set_text(s_clock_status, status)", UI)
+        self.assertIn("label_if_changed(s_clock_status, status)", UI)
         self.assertNotIn('lv_label_set_text(s_clock_status, "SYNC STALE")', UI)
         self.assertIn('lv_label_set_text(s_clock_status, "CLOCK NOT SET")', UI)
         self.assertIn('elapsed > pdMS_TO_TICKS(24U * 60U * 60U * 1000U)', NETWORK)
