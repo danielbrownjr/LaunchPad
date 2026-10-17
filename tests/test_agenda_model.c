@@ -169,12 +169,68 @@ static void test_invalid_input(void)
     assert(!lp_agenda_validate(&data));
 }
 
+static void test_utf8_edges(void)
+{
+    static const struct { const char *text; bool valid; } cases[] = {
+        {"\xc2\x80", false},         /* C1 control U+0080 */
+        {"\xc2\x9f", false},         /* C1 control U+009F */
+        {"\xc2\xa0", true},          /* first non-control 2-byte */
+        {"\x7f", false},             /* DEL */
+        {"\xe0\x9f\xbf", false},     /* overlong 3-byte */
+        {"\xed\xa0\x80", false},     /* UTF-16 surrogate */
+        {"\xef\xbf\xbd", true},      /* U+FFFD */
+        {"\xf0\x8f\xbf\xbf", false}, /* overlong 4-byte */
+        {"\xf0\x9f\x98\x80", true},  /* U+1F600 */
+        {"\xf4\x90\x80\x80", false}, /* above U+10FFFF */
+        {"\xf5\x80\x80\x80", false}, /* invalid lead byte */
+        {"\x80", false},             /* lone continuation */
+        {"ab\xe2\x82", false},       /* truncated before NUL */
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
+        lp_agenda_snapshot_t data = fixture();
+        strcpy(data.items[0].label, cases[i].text);
+        assert(lp_agenda_validate(&data) == cases[i].valid);
+    }
+
+    /* A multibyte character must fit wholly inside the 48-byte cap. */
+    lp_agenda_snapshot_t data = fixture();
+    memset(data.items[0].label, 'a', LP_AGENDA_LABEL_LEN - 2);
+    memcpy(data.items[0].label + LP_AGENDA_LABEL_LEN - 2, "\xc3\xa9", 3);
+    assert(lp_agenda_validate(&data)); /* 48 bytes exactly */
+    memset(data.items[0].label, 'a', LP_AGENDA_LABEL_LEN - 1);
+    memcpy(data.items[0].label + LP_AGENDA_LABEL_LEN - 1, "\xc3\xa9", 2);
+    assert(!lp_agenda_validate(&data)); /* 49 bytes, no terminator */
+}
+
+static void test_ttl_boundary(void)
+{
+    lp_agenda_snapshot_t data = fixture();
+    data.source = LP_AGENDA_SOURCE_BRIDGE;
+    data.source_updated_at_utc = data.generated_at_utc;
+    data.items[0].ends_at_utc = FIXED_NOW + 86400;
+    const int64_t ttl = data.ttl_seconds;
+    assert(lp_agenda_view(&data, FIXED_NOW + ttl, true) == LP_AGENDA_VIEW_CURRENT);
+    assert(lp_agenda_view(&data, FIXED_NOW + ttl + 1, true) == LP_AGENDA_VIEW_STALE);
+
+    /* A freshly generated response cannot refresh an old upstream read. */
+    data.source_updated_at_utc = FIXED_NOW - 1;
+    assert(lp_agenda_view(&data, FIXED_NOW + ttl - 1, true) == LP_AGENDA_VIEW_CURRENT);
+    assert(lp_agenda_view(&data, FIXED_NOW + ttl, true) == LP_AGENDA_VIEW_STALE);
+
+    /* Up to five minutes of future skew is tolerated, not more. */
+    data.source_updated_at_utc = FIXED_NOW;
+    assert(lp_agenda_view(&data, FIXED_NOW - 300, true) == LP_AGENDA_VIEW_CURRENT);
+    assert(lp_agenda_view(&data, FIXED_NOW - 301, true) == LP_AGENDA_VIEW_INVALID);
+}
+
 int main(void)
 {
     test_one_and_empty();
     test_selection_order_and_status();
     test_midnight_and_expiry();
     test_invalid_input();
+    test_utf8_edges();
+    test_ttl_boundary();
     puts("agenda model: all native cases passed");
     return 0;
 }
