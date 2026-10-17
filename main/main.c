@@ -1,7 +1,9 @@
 #include <stdint.h>
 #include <inttypes.h>
+#include <time.h>
 
 #include "agenda_store.h"
+#include "agenda_demo.h"
 #include "board.h"
 #include "dashboard.h"
 #include "esp_err.h"
@@ -184,6 +186,10 @@ void app_main(void)
             last_clock_second = second;
             lp_dashboard_update_clock();
             lp_wifi_ui_tick();
+            /* Fictional only; no producer before genuine SNTP time validity.
+             * Rebuild at Eastern day rollover, never on network status alone. */
+            (void)lp_agenda_demo_poll((int64_t)time(NULL),
+                                      lp_network_clock_valid());
         }
 #if LP_SOAK_TELEMETRY_ENABLED
         if (second - last_diag_second >= LP_SOAK_DIAG_INTERVAL_S) {
