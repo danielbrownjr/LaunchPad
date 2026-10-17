@@ -37,7 +37,7 @@ NVS errors do not trigger erase/reformat operations.
 - SYNCED: actual SNTP time callback, not a guessed plausible epoch.
 - OFFLINE TIME: time previously validated, P4 system clock advancing,
   but Wi-Fi/IP subsequently lost.
-- SYNC STALE: at least 24 hours since the latest confirmed NTP callback.
+- LAST SYNC >24H: more than 24 hours since the latest confirmed NTP callback.
 - ERROR: initialization or remote Wi-Fi RPC error.
 
 On cold boot without an SNTP callback, render --:-- and CLOCK NOT SET.
