@@ -26,7 +26,9 @@ void lp_dashboard_update_clock(void)
     if (!lp_clock_format(time(NULL), formatted, sizeof(formatted))) return;
     lv_label_set_text(s_clock_label, formatted);
     if (lp_network_clock_stale()) {
-        lv_label_set_text(s_clock_status, "SYNC STALE");
+        /* Last confirmed SNTP update was over 24 hours ago; the clock
+         * continues to run, but its accuracy has not been reverified. */
+        lv_label_set_text(s_clock_status, "LAST SYNC >24H");
     } else if (lp_network_state() == LP_NET_SYNCED) {
         lv_label_set_text(s_clock_status, "TIME SYNCED");
     } else {
