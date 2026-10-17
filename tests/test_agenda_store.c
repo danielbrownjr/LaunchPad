@@ -1,5 +1,7 @@
 #include "agenda_store.h"
 
+/* Every check below calls the API inside assert(); never compile it out. */
+#undef NDEBUG
 #include <assert.h>
 #include <pthread.h>
 #include <stdatomic.h>
@@ -88,6 +90,14 @@ static void test_errors_and_recovery(void)
     assert(strcmp(out.snapshot.items[0].id, "good-1") == 0);
     assert(out.snapshot.source_checked_at_utc == EPOCH - 60);
 
+    /* Invalid input while in FETCH_ERROR must not clear the error, bump the
+     * revision or replace the retained last-good snapshot. */
+    assert(!lp_agenda_store_publish(&data)); /* schema_version is still 999 */
+    assert(lp_agenda_store_read(&out));
+    assert(out.provider == LP_AGENDA_PROVIDER_FETCH_ERROR);
+    assert(out.revision == 3 && out.has_snapshot);
+    assert(strcmp(out.snapshot.items[0].id, "good-1") == 0);
+
     data = sample("recovered");
     assert(lp_agenda_store_publish(&data));
     assert(lp_agenda_store_read(&out));
@@ -175,11 +185,97 @@ static void test_concurrent_atomic_copies(void)
     assert(after.provider == LP_AGENDA_PROVIDER_OK);
 }
 
+/* Publishers, an error reporter and readers race. Every read must be one
+ * coherent state: a valid retained snapshot, a legal provider status and a
+ * revision that never moves backwards for that reader. */
+static atomic_uint s_mixed_done;
+static atomic_uint s_errors_reported;
+
+static void *mixed_writer(void *arg)
+{
+    const writer_arg_t *w = arg;
+    for (unsigned i = 0; i < ROUNDS; ++i) {
+        char id[LP_AGENDA_ID_LEN + 1];
+        (void)snprintf(id, sizeof(id), "m%u-%04u", w->writer, i);
+        lp_agenda_snapshot_t data = sample(id);
+        assert(lp_agenda_store_publish(&data));
+        if ((i % 7U) == 0U) {
+            data.schema_version = 999; /* Racing invalid input is a no-op. */
+            assert(!lp_agenda_store_publish(&data));
+        }
+    }
+    atomic_fetch_add(&s_mixed_done, 1U);
+    return NULL;
+}
+
+static void *error_reporter(void *unused)
+{
+    (void)unused;
+    while (atomic_load(&s_mixed_done) < 2U) {
+        assert(lp_agenda_store_mark_fetch_error());
+        atomic_fetch_add(&s_errors_reported, 1U);
+    }
+    atomic_fetch_add(&s_mixed_done, 1U);
+    return NULL;
+}
+
+static void *mixed_reader(void *unused)
+{
+    (void)unused;
+    uint64_t previous = 0;
+    unsigned reads = 0;
+    while (atomic_load(&s_mixed_done) < 3U || reads < 100U) {
+        lp_agenda_store_state_t state;
+        assert(lp_agenda_store_read(&state));
+        assert(state.revision >= previous);
+        previous = state.revision;
+        assert(state.has_snapshot);
+        assert(state.provider == LP_AGENDA_PROVIDER_OK ||
+               state.provider == LP_AGENDA_PROVIDER_FETCH_ERROR);
+        assert(state.snapshot.count == 1);
+        assert(strcmp(state.snapshot.items[0].id, state.snapshot.items[0].label) == 0);
+        assert(state.snapshot.source_checked_at_utc == EPOCH - 60);
+        assert(lp_agenda_validate(&state.snapshot));
+        ++reads;
+    }
+    return NULL;
+}
+
+static void test_concurrent_errors_and_publication(void)
+{
+    lp_agenda_store_state_t before;
+    assert(lp_agenda_store_read(&before));
+    assert(before.has_snapshot && before.provider == LP_AGENDA_PROVIDER_OK);
+    atomic_init(&s_mixed_done, 0U);
+    atomic_init(&s_errors_reported, 0U);
+
+    pthread_t writers[2], errors, readers[2];
+    writer_arg_t args[2] = { { .writer = 0 }, { .writer = 1 } };
+    for (unsigned i = 0; i < 2; ++i)
+        assert(pthread_create(&writers[i], NULL, mixed_writer, &args[i]) == 0);
+    assert(pthread_create(&errors, NULL, error_reporter, NULL) == 0);
+    for (unsigned i = 0; i < 2; ++i)
+        assert(pthread_create(&readers[i], NULL, mixed_reader, NULL) == 0);
+    for (unsigned i = 0; i < 2; ++i) assert(pthread_join(writers[i], NULL) == 0);
+    assert(pthread_join(errors, NULL) == 0);
+    for (unsigned i = 0; i < 2; ++i) assert(pthread_join(readers[i], NULL) == 0);
+
+    /* Each valid publication bumps once; each error report bumps at most once
+     * (only on a transition into FETCH_ERROR). Invalid publishes never do. */
+    lp_agenda_store_state_t after;
+    assert(lp_agenda_store_read(&after));
+    const uint64_t published = 2U * ROUNDS;
+    assert(after.revision >= before.revision + published);
+    assert(after.revision <= before.revision + published +
+                             atomic_load(&s_errors_reported));
+}
+
 int main(void)
 {
     test_pre_init_and_empty();
     test_errors_and_recovery();
     test_concurrent_atomic_copies();
+    test_concurrent_errors_and_publication();
     puts("agenda store: all native cases passed");
     return 0;
 }
