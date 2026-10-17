@@ -4,6 +4,7 @@
 
 #include "agenda_store.h"
 #include "agenda_demo.h"
+#include "clock_util.h"
 #include "board.h"
 #include "dashboard.h"
 #include "esp_err.h"
@@ -116,6 +117,10 @@ void app_main(void)
         ESP_LOGW(TAG, "Expected 32 MiB PSRAM from module marking; actual size differs");
     }
 
+    /* Establish the Eastern display timezone before the first possible
+     * agenda time conversion on the LVGL task, even if C5 fails. */
+    lp_clock_timezone_init();
+
     /* Reserve the provider-neutral agenda store during single-task startup.
      * A failed mutex allocation must not prevent clock/network diagnostics;
      * future providers will receive a false return from publish/read. */
@@ -190,6 +195,7 @@ void app_main(void)
              * Rebuild at Eastern day rollover, never on network status alone. */
             (void)lp_agenda_demo_poll((int64_t)time(NULL),
                                       lp_network_clock_valid());
+            lp_dashboard_update_agenda();
         }
 #if LP_SOAK_TELEMETRY_ENABLED
         if (second - last_diag_second >= LP_SOAK_DIAG_INTERVAL_S) {
