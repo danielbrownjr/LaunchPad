@@ -23,6 +23,12 @@ records never replace the last-good snapshot. Inputs must remain stable
 until `publish` returns; this cannot make racing writes to a caller-owned
 input buffer safe.
 
+Caller stack cost is bounded but not small. On ESP32-P4 (RV32 ILP32,
+ESP-IDF 6.0.3 GCC `-Os`) a snapshot is 1,376 bytes and a store state is
+1,392 bytes; `publish` uses a 1,408-byte frame plus validation, and `read`
+needs a caller-supplied 1,392-byte output. Size provider task stacks for
+that, and prefer a static output buffer on the LVGL task.
+
 No network I/O, time conversion, LVGL calls, log formatting, or error
 handling occurs while holding the mutex. Snapshot copying and provider
 status updates are the only lock-protected operations. A store lock waits
@@ -66,9 +72,11 @@ network status *independently* of the provider and data freshness.
 
 Native CI compiles the exact production `agenda_store.c`, not a reimplemented
 Python store. A small test-only pthread shim supplies the FreeRTOS semaphore
-API on Linux. Tests cover initialization/empty reads, invalid rejection,
-publication/copy isolation, retaining data during fetch failure, recovery,
-revision semantics, and simultaneous publishers/readers. The actual pinned
+API on Linux. Tests cover initialization/empty reads, invalid rejection (including while in
+FETCH_ERROR), publication/copy isolation, retaining data during fetch failure,
+recovery, revision semantics, simultaneous publishers/readers, and publishers
+racing an error reporter and two readers. CI also runs the store tests under
+ThreadSanitizer. The actual pinned
 ESP-IDF 6.0.3 ESP32-P4 build compiles the real FreeRTOS version.
 
 **Limits:** host pthread tests prove the store's data handling under a
