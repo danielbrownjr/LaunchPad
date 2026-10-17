@@ -119,8 +119,9 @@ bool lp_agenda_demo_poll(int64_t now_utc, bool clock_valid)
         return false;
 
     if (!lp_agenda_store_read(&stored)) return false;
-    /* Future bridge-owned data must never be silently replaced by DEMO,
-     * including retained data in FETCH_ERROR. No bridge exists in S2. */
+    /* Best-effort guard for an already observed BRIDGE snapshot, including
+     * retained FETCH_ERROR data. This read + publish is NOT atomic versus a
+     * future concurrent bridge writer; disable DEMO before starting one. */
     if (stored.has_snapshot && stored.snapshot.source == LP_AGENDA_SOURCE_BRIDGE)
         return false;
 
