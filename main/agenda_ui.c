@@ -37,10 +37,12 @@ static lv_obj_t *s_overlay;
 static lv_obj_t *s_detail_banner;
 static lv_obj_t *s_detail_source;
 static lv_obj_t *s_detail_freshness;
+static lv_obj_t *s_list;
 static lv_obj_t *s_empty;
 static ui_row_t s_rows[LP_AGENDA_MAX_ITEMS];
 static bool s_dim_initialized;
 static bool s_last_dim;
+static size_t s_last_row_count;
 
 static lv_obj_t *text_at(lv_obj_t *parent, const char *initial, int x, int y,
                          int width, uint32_t color, const lv_font_t *font)
@@ -94,6 +96,9 @@ static void close_agenda(lv_event_t *event)
 static void open_agenda(lv_event_t *event)
 {
     (void)event;
+    /* Always start at the first row: an offset kept from a longer list
+     * could otherwise leave every current row above the viewport. */
+    lv_obj_scroll_to_y(s_list, 0, LV_ANIM_OFF);
     lv_obj_remove_flag(s_overlay, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(s_overlay);
 }
@@ -156,6 +161,7 @@ void lp_agenda_ui_create(lv_obj_t *root)
     (void)close_button(s_overlay);
 
     lv_obj_t *list = lv_obj_create(s_overlay);
+    s_list = list;
     lv_obj_set_pos(list, 19, 82);
     lv_obj_set_size(list, 729, 348);
     lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
@@ -251,6 +257,11 @@ void lp_agenda_ui_apply(const lp_agenda_vm_t *view)
             set_muted(ui->label, view->dim_schedule);
         lv_obj_remove_flag(ui->card, LV_OBJ_FLAG_HIDDEN);
     }
+    /* Hiding rows does not clamp LVGL's scroll offset: after the list
+     * shrinks, a deep offset would show an empty viewport. */
+    if (view->row_count != s_last_row_count)
+        lv_obj_scroll_to_y(s_list, 0, LV_ANIM_OFF);
+    s_last_row_count = view->row_count;
     s_last_dim = view->dim_schedule;
     s_dim_initialized = true;
 }

@@ -79,6 +79,15 @@ class AgendaUiContract(unittest.TestCase):
         self.assertIn("LV_LABEL_LONG_MODE_DOTS", text_at)
         self.assertIn("lv_obj_set_size(label, width, lv_font_get_line_height(font))", text_at)
 
+    def test_agenda_list_never_keeps_a_stale_scroll_offset(self):
+        # Hiding rows does not clamp LVGL's scroll offset: with 8 rows
+        # scrolled to the bottom, a 2-row update showed an empty list.
+        opener = re.search(r"static void open_agenda\(.*?\n\}", UI, flags=re.S).group(0)
+        self.assertIn("lv_obj_scroll_to_y(s_list, 0, LV_ANIM_OFF);", opener)
+        apply = UI[UI.index("void lp_agenda_ui_apply("):]
+        self.assertIn("if (view->row_count != s_last_row_count)", apply)
+        self.assertIn("lv_obj_scroll_to_y(s_list, 0, LV_ANIM_OFF);", apply)
+
     def test_fixed_geometry_inside_screen(self):
         # All top-level cards/overlays remain in the 800x480 viewport.
         for x, y, width, height in re.findall(
