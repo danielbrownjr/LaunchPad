@@ -39,6 +39,8 @@ static lv_obj_t *s_detail_source;
 static lv_obj_t *s_detail_freshness;
 static lv_obj_t *s_empty;
 static ui_row_t s_rows[LP_AGENDA_MAX_ITEMS];
+static bool s_dim_initialized;
+static bool s_last_dim;
 
 static lv_obj_t *text_at(lv_obj_t *parent, const char *initial, int x, int y,
                          int width, uint32_t color, const lv_font_t *font)
@@ -222,7 +224,10 @@ void lp_agenda_ui_apply(const lp_agenda_vm_t *view)
         (void)snprintf(then_line, sizeof(then_line), "THEN %s  %s",
                        view->then_time, view->then_label);
     update_text(s_then, then_line);
-    set_muted(s_hero_label, view->dim_schedule);
+    /* Style mutations trigger LVGL redraw work. Only restyle on an actual
+     * dim-state transition, not on every once-per-second clock refresh. */
+    bool restyle = !s_dim_initialized || s_last_dim != view->dim_schedule;
+    if (restyle) set_muted(s_hero_label, view->dim_schedule);
     show_preview(view);
 
     bool empty = view->row_count == 0;
@@ -240,7 +245,9 @@ void lp_agenda_ui_apply(const lp_agenda_vm_t *view)
         update_text(ui->tag, row->tag);
         update_text(ui->label, row->label);
         update_text(ui->location, row->location);
-        set_muted(ui->label, view->dim_schedule);
+        if (restyle) set_muted(ui->label, view->dim_schedule);
         lv_obj_remove_flag(ui->card, LV_OBJ_FLAG_HIDDEN);
     }
+    s_last_dim = view->dim_schedule;
+    s_dim_initialized = true;
 }
