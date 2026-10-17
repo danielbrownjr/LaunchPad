@@ -125,6 +125,18 @@ class BringupGuards(unittest.TestCase):
         self.assertIn("CONFIG_ESP_HOSTED_SDIO_GPIO_RESET_SLAVE", checker)
         self.assertIn("build/launchpad.bin", checker)
 
+    def test_clock_sync_age_label_is_explicit_and_separate_from_validity(self):
+        # Actual runtime SNTP interval is independent from the dashboard
+        # label. The time remains displayed after a confirmed sync.
+        self.assertIn('lv_label_set_text(s_clock_status, "LAST SYNC >24H")', UI)
+        self.assertNotIn('lv_label_set_text(s_clock_status, "SYNC STALE")', UI)
+        self.assertIn('lv_label_set_text(s_clock_status, "TIME SYNCED")', UI)
+        self.assertIn('lv_label_set_text(s_clock_status, "OFFLINE TIME")', UI)
+        self.assertIn('lv_label_set_text(s_clock_status, "CLOCK NOT SET")', UI)
+        self.assertIn('elapsed > pdMS_TO_TICKS(24U * 60U * 60U * 1000U)', NETWORK)
+        self.assertLess(UI.index('if (!lp_network_clock_valid())'),
+                        UI.index('if (lp_network_clock_stale())'))
+
     def test_credentials_dhcp_and_trustworthy_clock(self):
         cmake = (ROOT / "main/CMakeLists.txt").read_text(encoding="utf-8")
         clock = (ROOT / "main/clock_util.c").read_text(encoding="utf-8")
