@@ -400,7 +400,7 @@
         "time_zone": "America/New_York",
         "ttl_seconds": 3600,
         "appointments": [],
-        "access_token": "MUST_NOT_ACCEPT"
+        "unexpected_field": true
       }
     }
   ]
