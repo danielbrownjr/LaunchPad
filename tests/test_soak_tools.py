@@ -144,7 +144,7 @@ class SoakTools(unittest.TestCase):
         self.assertEqual(events[0]["retries"], 1)
 
     def test_window_excludes_setup_activity(self):
-        text = self.summarize("--from", "2026-10-16T12:00:07Z",
+        text = self.summarize("--from", "2026-10-16T12:00:06Z",
                               "--to", "2026-10-16T12:00:08Z")
         self.assertIn("requested window:", text)
         self.assertIn("keyboard opens: 0", text)
