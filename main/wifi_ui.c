@@ -4,6 +4,7 @@
  * Only bounded, nonblocking requests go to the network worker.
  */
 #include "wifi_ui.h"
+#include "dashboard.h"
 #include "network.h"
 #include "credentials.h"
 #include "wifi_keyboard.h"
@@ -233,6 +234,12 @@ static void render_scan(void)
     }
 }
 
+static void diagnostics_pressed(lv_event_t *event)
+{
+    (void)event;
+    lp_dashboard_open_diagnostics();
+}
+
 static void create_panel(lv_obj_t *root)
 {
     s_ui.panel = lv_obj_create(root);
@@ -265,6 +272,8 @@ static void create_panel(lv_obj_t *root)
     button(s_ui.list_page, "Scan", 12, 287, 128, 40, scan_pressed);
     button(s_ui.list_page, "Manual SSID", 153, 287, 182, 40, manual_ssid);
     button(s_ui.list_page, "Forget saved", 350, 287, 170, 40, forget_pressed);
+    button(s_ui.list_page, "Diagnostics", 535, 287, 158, 40,
+           diagnostics_pressed);
 
     s_ui.form_page = lv_obj_create(s_ui.panel);
     lv_obj_set_pos(s_ui.form_page, 10, 52);
@@ -319,6 +328,9 @@ static void open_setup(lv_event_t *event)
     s_ui.forget_confirm = false;
     show_list();
     lv_obj_remove_flag(s_ui.panel, LV_OBJ_FLAG_HIDDEN);
+    /* The agenda overlay raises itself when opened; Settings must also be
+     * on top, or a later open renders hidden beneath that overlay. */
+    lv_obj_move_foreground(s_ui.panel);
     if (lp_network_scan_status() == LP_SCAN_READY) render_scan();
     else scan_pressed(NULL);
 }
