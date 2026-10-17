@@ -116,9 +116,11 @@ static lv_obj_t *close_button(lv_obj_t *parent)
     lv_obj_set_size(button, 89, 44); /* >= 44px touch target. */
     lv_obj_set_style_bg_color(button, lv_color_hex(0x246B88), 0);
     lv_obj_set_style_radius(button, 8, 0);
-    lv_obj_t *caption = text_at(button, "Close", 20, 12, 60, C_TEXT,
-                                &lv_font_montserrat_14);
-    (void)caption;
+    lv_obj_t *caption = lv_label_create(button);
+    lv_label_set_text(caption, "Close");
+    lv_obj_set_style_text_font(caption, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(caption, lv_color_hex(C_TEXT), 0);
+    lv_obj_center(caption);
     lv_obj_add_event_cb(button, close_agenda, LV_EVENT_CLICKED, NULL);
     return button;
 }

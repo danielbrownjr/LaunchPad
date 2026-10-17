@@ -328,6 +328,9 @@ static void open_setup(lv_event_t *event)
     s_ui.forget_confirm = false;
     show_list();
     lv_obj_remove_flag(s_ui.panel, LV_OBJ_FLAG_HIDDEN);
+    /* The agenda overlay raises itself when opened; Settings must also be
+     * on top, or a later open renders hidden beneath that overlay. */
+    lv_obj_move_foreground(s_ui.panel);
     if (lp_network_scan_status() == LP_SCAN_READY) render_scan();
     else scan_pressed(NULL);
 }

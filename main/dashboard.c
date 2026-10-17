@@ -180,8 +180,11 @@ void lp_dashboard_open_diagnostics(void)
         lv_obj_set_pos(close, 647, 12);
         lv_obj_set_size(close, 95, 45);
         lv_obj_set_style_bg_color(close, lv_color_hex(0x246B88), 0);
-        label_at(close, "Close", 20, 13, 70, 0xFFFFFF,
-                 &lv_font_montserrat_14);
+        lv_obj_t *caption = lv_label_create(close);
+        lv_label_set_text(caption, "Close");
+        lv_obj_set_style_text_font(caption, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_color(caption, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_center(caption);
         lv_obj_add_event_cb(close, close_diagnostics, LV_EVENT_CLICKED, NULL);
     }
     lv_obj_remove_flag(s_diagnostics, LV_OBJ_FLAG_HIDDEN);

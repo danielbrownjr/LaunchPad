@@ -119,6 +119,13 @@ class AgendaUiContract(unittest.TestCase):
     def test_last_known_preview_is_dimmed(self):
         self.assertIn("set_muted(s_preview_first, view->dim_schedule);", UI)
 
+    def test_settings_opens_above_agenda_overlay(self):
+        # The agenda overlay raises itself; Settings must also raise itself
+        # or a later open renders beneath it.
+        opener = re.search(r"static void open_setup\(.*?\n\}", WIFI, flags=re.S).group(0)
+        self.assertLess(opener.index("lv_obj_remove_flag(s_ui.panel, LV_OBJ_FLAG_HIDDEN);"),
+                        opener.index("lv_obj_move_foreground(s_ui.panel);"))
+
     def test_fixed_geometry_inside_screen(self):
         # All top-level cards/overlays remain in the 800x480 viewport.
         for x, y, width, height in re.findall(
