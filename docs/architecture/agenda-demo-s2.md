@@ -53,11 +53,14 @@ multiple 1.4 KiB snapshot frames to the 8 KiB LVGL task stack. The
 poll function must therefore be called only on `app_main`, not from
 another task or an ISR.
 
-S2 will **not overwrite** a snapshot marked as source BRIDGE, even when
-the bridge provider reports FETCH_ERROR and its last-good records remain
-stored. A future production/bridge mode should disable the demo source
-explicitly; this guard is defense in depth, not authorization for
-Simpro access. Only future approved provider code may create bridge data.
+S2 checks for an **already stored** BRIDGE source (including retained
+last-good records during FETCH_ERROR) and skips publishing if one is found.
+This check is **not atomic** with publication: a future concurrent bridge
+producer could publish between the check and the DEMO write. Future
+production/bridge mode MUST disable demo polling before starting a bridge
+writer, or add atomic source-ownership arbitration in the store. There is
+no bridge producer in S2. This guard is defense in depth, not permission
+to access Simpro. Only separately approved code may create bridge data.
 
 S2 is not a screen change: the on-screen appointment card remains the
 explicitly synthetic placeholder until S3/S4 consume the store. Do not
