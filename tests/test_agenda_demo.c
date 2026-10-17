@@ -3,6 +3,7 @@
 #include "clock_util.h"
 
 #include <assert.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -123,6 +124,94 @@ static void test_eastern_dst_days_and_repeated_hour(void)
     assert(fold_one.items[3].starts_at_utc == fold_two.items[3].starts_at_utc);
 }
 
+/* Ground truth from the IANA America/New_York zone (Python zoneinfo), NOT
+ * from this C library. Round-tripping mktime() through the same libc's
+ * localtime_r() cannot detect a consistently wrong TZ implementation, and
+ * the ESP32-P4 build links picolibc while host CI links glibc. */
+static void assert_starts(const lp_agenda_snapshot_t *s, int64_t a, int64_t b,
+                          int64_t c, int64_t d)
+{
+    assert(s->count == 4);
+    assert(s->items[0].starts_at_utc == a);
+    assert(s->items[1].starts_at_utc == b);
+    assert(s->items[2].starts_at_utc == c);
+    assert(s->items[3].starts_at_utc == d);
+}
+
+static void test_absolute_utc_and_calendar_edges(void)
+{
+    lp_agenda_snapshot_t s;
+    /* Ordinary EDT day: 09:30 EDT = 13:30Z; 12:30, 16:00 same day. */
+    assert(lp_agenda_demo_build(1792245600, true, &s));   /* 10-17 10:00 */
+    assert_starts(&s, 1792243800, 1792243800 + 3 * 3600,
+                  1792243800 + 6 * 3600 + 1800, 1792243800 + 86400);
+
+    /* Day before spring-forward: tomorrow 09:30 EDT is only 23 h later. */
+    assert(lp_agenda_demo_build(1772902800, true, &s));   /* 03-07 12:00 */
+    assert(s.items[0].starts_at_utc == 1772893800);       /* 14:30Z EST */
+    assert(s.items[3].starts_at_utc == 1772976600);       /* 13:30Z EDT */
+    /* On the 23-hour day itself, after the 02:00 jump. */
+    assert(lp_agenda_demo_build(1772955000, true, &s));   /* 03-08 03:30 */
+    assert(s.items[0].starts_at_utc == 1772976600);
+    assert(s.items[3].starts_at_utc == 1773063000);
+
+    /* Day before fall-back: tomorrow is 25 h later. */
+    assert(lp_agenda_demo_build(1793462400, true, &s));   /* 10-31 12:00 */
+    assert(s.items[0].starts_at_utc == 1793453400);       /* 13:30Z EDT */
+    assert(s.items[3].starts_at_utc == 1793543400);       /* 14:30Z EST */
+    /* Both occurrences of the repeated 01:30 map to the same day. */
+    lp_agenda_snapshot_t second;
+    assert(lp_agenda_demo_build(1793511000, true, &s));   /* first 01:30 */
+    assert(lp_agenda_demo_build(1793514600, true, &second));
+    assert_starts(&s, 1793543400, 1793543400 + 3 * 3600,
+                  1793543400 + 6 * 3600 + 1800, 1793629800);
+    assert(memcmp(s.items, second.items, sizeof(s.items)) == 0);
+
+    /* Leap years: 2028-02-28 -> 02-29, 02-29 -> 03-01; 2027 and the
+     * non-leap century year 2100 go 02-28 -> 03-01. */
+    assert(lp_agenda_demo_build(1835370000, true, &s));   /* 2028-02-28 */
+    assert(s.items[0].starts_at_utc == 1835361000);
+    assert(s.items[3].starts_at_utc == 1835447400);       /* 02-29 */
+    assert(lp_agenda_demo_build(1835456400, true, &s));   /* 2028-02-29 */
+    assert(s.items[0].starts_at_utc == 1835447400);
+    assert(s.items[3].starts_at_utc == 1835533800);       /* 03-01 */
+    assert(lp_agenda_demo_build(1803834000, true, &s));   /* 2027-02-28 */
+    assert(s.items[3].starts_at_utc == 1803911400);       /* 03-01 */
+    assert(lp_agenda_demo_build(4107517200, true, &s));   /* 2100-02-28 */
+    assert(s.items[0].starts_at_utc == 4107508200);
+    assert(s.items[3].starts_at_utc == 4107594600);       /* 03-01 */
+
+    /* Year rollover, and past the signed 32-bit time_t limit. */
+    assert(lp_agenda_demo_build(1798779540, true, &s));   /* 12-31 23:59 */
+    assert(s.items[2].starts_at_utc == 1798750800);       /* 16:00 EST */
+    assert(s.items[3].starts_at_utc == 1798813800);       /* 2027-01-01 */
+    assert(lp_agenda_demo_build(2147500800, true, &s));   /* 2038-01-19 */
+    assert(s.items[0].starts_at_utc == 2147524200);
+    assert(s.items[3].starts_at_utc == 2147610600);
+}
+
+static void test_invalid_times_leave_output_untouched(void)
+{
+    lp_agenda_snapshot_t out, original;
+    memset(&out, 0x5a, sizeof(out));
+    original = out;
+    const int64_t bad[] = {
+        INT64_MIN, -1, 0, (int64_t)LP_CLOCK_MIN_EPOCH - 1, INT64_MAX,
+    };
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
+        assert(!lp_agenda_demo_build(bad[i], true, &out));
+        assert(memcmp(&out, &original, sizeof(out)) == 0);
+        assert(!lp_agenda_demo_poll(bad[i], true));
+    }
+}
+
+/* Runs before the store is initialized: a failed publication must not
+ * mark the day done, so the same day is published once the store works. */
+static void test_publication_failure_does_not_mark_day(void)
+{
+    assert(!lp_agenda_demo_poll(1792252800, true));       /* 10-17 12:00 */
+}
+
 static void test_store_integration_and_rollover(void)
 {
     assert(lp_agenda_store_init());
@@ -160,6 +249,28 @@ static void test_store_integration_and_rollover(void)
     assert_local_slot(state.snapshot.items[0].starts_at_utc,
                       2026, 10, 18, 9, 30);
 
+    /* Same-day polling, including a backward correction that stays on the
+     * same local day, never republishes. */
+    revision = state.revision;
+    for (int i = 0; i < 60; ++i) assert(!lp_agenda_demo_poll(1792350000, true));
+    assert(!lp_agenda_demo_poll(1792296030, true));     /* 10-18 00:00:30 */
+    assert(lp_agenda_store_read(&state) && state.revision == revision);
+
+    /* SNTP correction backwards across midnight follows the local date. */
+    assert(lp_agenda_demo_poll(1792295880, true));      /* 10-17 23:58 */
+    assert(lp_agenda_store_read(&state) && state.revision == revision + 1);
+    assert(state.snapshot.items[0].starts_at_utc == 1792243800);
+    /* And a forward jump of several days publishes that day's schedule. */
+    assert(lp_agenda_demo_poll(1792936800, true));      /* 10-25 10:00 */
+    assert(lp_agenda_store_read(&state) && state.revision == revision + 2);
+    assert(state.snapshot.items[0].starts_at_utc == 1792935000);
+    assert(!lp_agenda_demo_poll(1792936800 + 1, true));
+    assert(lp_agenda_store_read(&state) && state.revision == revision + 2);
+    /* Same tm_yday one year later is a different local day. */
+    assert(lp_agenda_demo_poll(1824472800, true));      /* 2027-10-25 */
+    assert(lp_agenda_store_read(&state) && state.revision == revision + 3);
+    assert(state.snapshot.items[0].starts_at_utc == 1824471000);
+
     /* Synthetic BRIDGE input in this test exercises the non-overwrite gate.
      * No real bridge or employer data is used. */
     lp_agenda_snapshot_t bridge = state.snapshot;
@@ -180,9 +291,12 @@ static void test_store_integration_and_rollover(void)
 int main(void)
 {
     lp_clock_timezone_init();
+    test_publication_failure_does_not_mark_day();
     test_clock_gate_and_bounds();
     test_stable_local_day_and_late_night();
     test_eastern_dst_days_and_repeated_hour();
+    test_absolute_utc_and_calendar_edges();
+    test_invalid_times_leave_output_untouched();
     test_store_integration_and_rollover();
     puts("agenda demo provider: all native cases passed");
     return 0;
