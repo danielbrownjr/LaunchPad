@@ -98,15 +98,21 @@ lp_agenda_view_t lp_agenda_view(const lp_agenda_snapshot_t *snapshot,
 
     /* A future-dated response is not a trusted freshness signal. Allow
      * five minutes of clock/transport skew but never time-travel CURRENT. */
-    if (snapshot->generated_at_utc > now_utc + 300 ||
-        snapshot->source_updated_at_utc > now_utc + 300)
+    if ((snapshot->generated_at_utc > now_utc &&
+         snapshot->generated_at_utc - now_utc > 300) ||
+        (snapshot->source_updated_at_utc > now_utc &&
+         snapshot->source_updated_at_utc - now_utc > 300))
         return LP_AGENDA_VIEW_INVALID;
 
     if (now_utc - snapshot->generated_at_utc > snapshot->ttl_seconds ||
         now_utc - snapshot->source_updated_at_utc > snapshot->ttl_seconds)
         return LP_AGENDA_VIEW_STALE;
-    return snapshot->count ? LP_AGENDA_VIEW_CURRENT
-                           : LP_AGENDA_VIEW_NO_JOBS;
+
+    /* A cancelled, unscheduled or fully completed day is not a live
+     * NEXT JOB, even when the transport returned nonempty records. */
+    size_t next_index;
+    return lp_agenda_next(snapshot, now_utc, &next_index)
+           ? LP_AGENDA_VIEW_CURRENT : LP_AGENDA_VIEW_NO_JOBS;
 }
 
 bool lp_agenda_next(const lp_agenda_snapshot_t *snapshot,
