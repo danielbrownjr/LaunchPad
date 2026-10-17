@@ -27,12 +27,40 @@ soak, do not tap **Save & connect** or **Forget saved**: both write NVS.
 
 - Task watchdog output (starved task, running task per CPU, backtrace) is
   printed by ESP-IDF 6.0.3 with panic disabled — capture the full log.
-- Heap and network-worker stack trends are **not logged** by the current
-  firmware; a soak PASS is "no watchdog/reset/freeze for N hours", not a
-  memory-stability result.
+- The previously tested PR #36 build (`cff7345`) logged only a one-time
+  main-task stack watermark. Its 12-hour PASS cannot establish memory stability.
+- Firmware built with `LP_SOAK_TELEMETRY_ENABLED=1` (default in this branch)
+  adds a **boot-time and hourly** `DIAG` record. It reports monotonic
+  `uptime_s`, internal 8-bit heap `internal_free_b` and
+  `internal_min_b`, PSRAM `psram_free_b` and `psram_min_b`, the
+  main/LVGL-owning task `main_stack_hwm_b`, and a self-sampled network
+  worker `network_stack_hwm_b`. `network_sample_age_s` states how old the
+  worker's last measurement is, and `network_valid=0` means a reported
+  worker watermark of zero is **unknown**, not a stack exhaustion.
+  No separate LVGL task exists, so do not report one.
+- To disable this low-rate diagnostic stream in a separate firmware build,
+  define `LP_SOAK_TELEMETRY_ENABLED=0` at compilation. Logs do not reveal
+  passwords, SSIDs, or IP addresses. The diagnostic recorder creates no
+  separate FreeRTOS task or heap buffers.
+- A single snapshot or a short session cannot establish long-term memory
+  stability. Time-separated samples, stack margin acceptance criteria, and
+  a controlled target-hardware run are still required.
 - CI artifacts include `launchpad.elf` / `launchpad.map` so a backtrace can be
   decoded against the exact image (`riscv32-esp-elf-addr2line -pfiaC -e
   launchpad.elf <MEPC> <RA> ...`). Images built before this change have no ELF.
+
+## Credential persistence diagnostic events
+
+The Wi-Fi command path now emits fixed, non-secret INFO strings when a save
+or forget command is **queued**, and when its NVS operation **commits**:
+`Wi-Fi save request queued`, `Wi-Fi save committed to P4 NVS`,
+`Wi-Fi forget request queued`, and `Wi-Fi forget persisted in P4 NVS`.
+
+A committed credential record does **not** establish successful Wi-Fi
+authentication or Internet reachability. Correlate later association,
+DHCP and SNTP lines to distinguish these outcomes. Nothing here changes
+NVS data layout, retry policy, or whether credentials are encrypted.
+Unencrypted NVS remains a prototype limitation.
 
 ## LVGL flush wait
 
