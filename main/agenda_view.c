@@ -155,8 +155,11 @@ bool lp_agenda_vm_build(const lp_agenda_store_state_t *store,
     }
     set_banner(out);
 
+    /* An up-to-date empty/completed day is still trustworthy. Only stale,
+     * source-error and unsynchronized records must be dimmed. */
     bool active = (out->state == LP_AGENDA_SCREEN_DEMO ||
-                   out->state == LP_AGENDA_SCREEN_CURRENT) && clock_valid;
+                   out->state == LP_AGENDA_SCREEN_CURRENT ||
+                   out->state == LP_AGENDA_SCREEN_NO_JOBS) && clock_valid;
     out->dim_schedule = !active;
     size_t order[LP_AGENDA_MAX_ITEMS];
     for (size_t i = 0; i < s->count; ++i) {
