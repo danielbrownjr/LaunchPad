@@ -1,10 +1,12 @@
 #include <stdint.h>
+#include <inttypes.h>
 
 #include "board.h"
 #include "dashboard.h"
 #include "esp_err.h"
 #include "esp_lcd_panel_rgb.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #include "esp_psram.h"
 #include "esp_timer.h"
 #include "touch.h"
@@ -22,6 +24,14 @@
 
 #define LVGL_TICK_MS 2
 #define LVGL_DRAW_LINES 48
+
+/* Compile-time override permits removing low-rate diagnostics from a
+ * production build. Default: one sample at boot and once per hour.
+ * No timer callback, heap allocation or additional FreeRTOS task. */
+#ifndef LP_SOAK_TELEMETRY_ENABLED
+#define LP_SOAK_TELEMETRY_ENABLED 1
+#endif
+#define LP_SOAK_DIAG_INTERVAL_S 3600
 
 static const char *TAG = "launchpad";
 /* Retained for the whole application lifetime. Do not release while running. */
@@ -55,6 +65,31 @@ static void lvgl_flush(lv_display_t *display, const lv_area_t *area, uint8_t *pi
     /* Success is acknowledged asynchronously by on_color_trans_done.
        Never release the draw buffer while the LCD driver is copying it. */
 }
+
+#if LP_SOAK_TELEMETRY_ENABLED
+static void log_soak_diagnostics(int64_t uptime_s)
+{
+    const size_t internal_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const size_t internal_min = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    const size_t psram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    const size_t psram_min = heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    const unsigned main_hwm = (unsigned)uxTaskGetStackHighWaterMark(NULL);
+    const lp_network_diag_t worker = lp_network_diag_snapshot();
+
+    /* All numbers are bytes except uptime/age seconds; zero network stack
+     * with valid=0 means not sampled, not zero free stack. */
+    ESP_LOGI(TAG, "DIAG uptime_s=%" PRId64
+             " internal_free_b=%u internal_min_b=%u"
+             " psram_free_b=%u psram_min_b=%u"
+             " main_stack_hwm_b=%u network_stack_hwm_b=%u"
+             " network_sample_age_s=%u network_valid=%u",
+             uptime_s, (unsigned)internal_free, (unsigned)internal_min,
+             (unsigned)psram_free, (unsigned)psram_min, main_hwm,
+             worker.available ? (unsigned)worker.worker_stack_hwm_bytes : 0U,
+             worker.available ? (unsigned)worker.sample_age_s : 0U,
+             worker.available ? 1U : 0U);
+}
+#endif
 
 void app_main(void)
 {
@@ -131,6 +166,9 @@ void app_main(void)
 
     /* Single-owner LVGL loop; there is no competing UI task. */
     int64_t last_clock_second = -1;
+#if LP_SOAK_TELEMETRY_ENABLED
+    int64_t last_diag_second = -LP_SOAK_DIAG_INTERVAL_S;
+#endif
     while (true) {
         lp_dashboard_set_network_state(lp_network_state());
         int64_t second = esp_timer_get_time() / 1000000;
@@ -139,6 +177,12 @@ void app_main(void)
             lp_dashboard_update_clock();
             lp_wifi_ui_tick();
         }
+#if LP_SOAK_TELEMETRY_ENABLED
+        if (second - last_diag_second >= LP_SOAK_DIAG_INTERVAL_S) {
+            last_diag_second = second;
+            log_soak_diagnostics(second);
+        }
+#endif
         uint32_t wait_ms = lv_timer_handler();
         if (wait_ms < 10) wait_ms = 10;
         if (wait_ms > 100) wait_ms = 100;
