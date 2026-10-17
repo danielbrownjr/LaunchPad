@@ -19,6 +19,7 @@ bool lp_agenda_demo_build(int64_t now_utc, bool clock_valid,
 /* Call from the single app_main/LVGL-owning task once per second, after store
  * init. Publishes at most once per Eastern calendar day, and never without
  * a verified clock. No extra FreeRTOS task. Returns true only when a
- * validated snapshot is published. Does not replace a bridge-owned snapshot.
- * Does not touch LVGL. */
+ * validated snapshot is published. The bridge-source check is best effort,
+ * not atomic against another publisher. A future bridge must disable DEMO
+ * before activating a concurrent writer. Does not touch LVGL. */
 bool lp_agenda_demo_poll(int64_t now_utc, bool clock_valid);
