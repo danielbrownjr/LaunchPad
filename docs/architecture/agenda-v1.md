@@ -100,8 +100,19 @@ never chosen. End times are exclusive.
 ## Tests
 
 `tests/fixtures/agenda_cases.json` includes zero, one, many, overlaps,
-cross-midnight, stale, cancelled/unscheduled, and intentionally invalid data.
-Native C tests cover the in-memory validator/selector/view decisions; Python
-fixtures check the proposed wire contract. The existing DST tests cover
-the device timezone formatter; no time-zone conversions occur in the
-in-memory selection routine.
+in-progress, cross-midnight, a DST fall-back repeated hour, stale, no-jobs,
+future-dated, cancelled/unscheduled, and intentionally invalid data. Every
+case states its expected validity, next appointment and view state.
+
+- `test_agenda_schema.py` checks the proposed wire contract with a Python
+  reference validator, selector and view assessment.
+- `test_agenda_native_fixtures.py` maps the same fixtures into the C DTO,
+  compiles `main/agenda_model.c` with CI's warning flags and checks that the C
+  model reaches the same validity, next appointment and view. Cases only a
+  JSON parser can reject (offsetless timestamps, unknown keys) are listed
+  explicitly. It skips locally without a C compiler but fails in CI.
+- `test_agenda_model.c` covers native boundaries: UTF-8 edges, field caps,
+  exact TTL and five-minute skew limits.
+
+The existing DST tests cover the device timezone formatter; no time-zone
+conversions occur in the in-memory selection routine.

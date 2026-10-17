@@ -5,10 +5,11 @@ bridge boundary, while native tests exercise the bounded C in-memory form.
 """
 import datetime as dt
 import json
+import os
 import re
 import unittest
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = json.loads((ROOT / "tests/fixtures/agenda_cases.json").read_text(encoding="utf-8"))
@@ -101,6 +102,34 @@ def selected_next(data, now):
     return candidates[0]["id"] if candidates else None
 
 
+def assess_view(data, now, clock_valid=True):
+    """Reference for lp_agenda_view(); the native fixture test checks C agrees."""
+    if not validate_wire(data):
+        return "INVALID"
+    if not clock_valid:
+        return "CLOCK_UNKNOWN"
+    if data["source"] == "demo":
+        return "DEMO"
+    generated = wire_time(data["generated_at"])
+    checked = wire_time(data["source_updated_at"])
+    if max(generated, checked) - now > dt.timedelta(seconds=300):
+        return "INVALID"
+    ttl = dt.timedelta(seconds=data["ttl_seconds"])
+    if now - generated > ttl or now - checked > ttl:
+        return "STALE"
+    return "CURRENT" if selected_next(data, now) else "NO_JOBS"
+
+
+def eastern():
+    try:
+        return ZoneInfo("America/New_York")
+    except ZoneInfoNotFoundError:
+        # Windows Python has no system tz database without the tzdata package.
+        if os.environ.get("CI"):
+            raise
+        raise unittest.SkipTest("tz database unavailable; install tzdata to run locally")
+
+
 class AgendaV1WireTests(unittest.TestCase):
     def test_all_fictional_cases_have_expected_validity(self):
         self.assertGreaterEqual(len(FIXTURES["cases"]), 12)
@@ -121,12 +150,37 @@ class AgendaV1WireTests(unittest.TestCase):
         case = next(x for x in FIXTURES["cases"] if x["name"] == "cross_midnight_offset")
         self.assertTrue(validate_wire(case["wire"]))
         item = case["wire"]["appointments"][0]
-        eastern = ZoneInfo("America/New_York")
-        first = wire_time(item["starts_at"]).astimezone(eastern)
-        last = wire_time(item["ends_at"]).astimezone(eastern)
+        zone = eastern()
+        first = wire_time(item["starts_at"]).astimezone(zone)
+        last = wire_time(item["ends_at"]).astimezone(zone)
         self.assertEqual(first.hour, 23)
         self.assertEqual(last.hour, 1)
         self.assertNotEqual(first.date(), last.date())
+
+    def test_fixture_view_states(self):
+        now = wire_time(FIXTURES["as_of"])
+        views = set()
+        for case in FIXTURES["cases"]:
+            with self.subTest(case=case["name"]):
+                self.assertEqual(assess_view(case["wire"], now), case["expected_view"])
+                views.add(case["expected_view"])
+                if case["expected_valid"]:
+                    self.assertEqual(assess_view(case["wire"], now, clock_valid=False),
+                                     "CLOCK_UNKNOWN")
+        self.assertEqual(views, {"DEMO", "CURRENT", "STALE", "NO_JOBS", "INVALID"})
+
+    def test_dst_fall_back_orders_by_utc_not_wall_clock(self):
+        case = next(x for x in FIXTURES["cases"]
+                    if x["name"] == "dst_fall_back_repeated_hour")
+        first, second = sorted(case["wire"]["appointments"],
+                               key=lambda item: wire_time(item["starts_at"]))
+        self.assertEqual(first["id"], "demo-dst-first")
+        zone = eastern()
+        first_wall = wire_time(first["starts_at"]).astimezone(zone)
+        second_wall = wire_time(second["starts_at"]).astimezone(zone)
+        # 01:30 EDT happens before 01:10 EST: wall-clock sorting would be wrong.
+        self.assertGreater(first_wall.time(), second_wall.time())
+        self.assertEqual((first_wall.fold, second_wall.fold), (0, 1))
 
     def test_utf8_lengths_are_bytes_not_characters(self):
         self.assertTrue(display_text("Café", 5))
