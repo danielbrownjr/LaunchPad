@@ -43,6 +43,12 @@ P = {
     "net_fail": re.compile(r"lp_net\w*: .* failed \("),
     "touch_err": re.compile(r"Touch I2C error"),
     "lcd_err": re.compile(r"LCD flush failed"),
+    "diag": re.compile(
+        r"DIAG uptime_s=(\\d+) internal_free_b=(\\d+) internal_min_b=(\\d+)"
+        r" psram_free_b=(\\d+) psram_min_b=(\\d+) main_stack_hwm_b=(\\d+)"
+        r" network_stack_hwm_b=(\\d+) network_sample_age_s=(\\d+)"
+        r" network_valid=(\\d+)"
+    ),
     "wdt": re.compile(r"Task watchdog got triggered"),
     "panic": re.compile(r"Guru Meditation|abort\(\) was called|Stack smashing|stack overflow|assert failed"),
 }
@@ -50,6 +56,11 @@ UPTIME = re.compile(r"^[IWEVD] \((\d+)\)")
 WIFI_DOWN = re.compile(r"Station mode: Disconnected")
 WIFI_UP = re.compile(r"Station mode: Connected|DHCP IP acquired")
 WIFI_IP = re.compile(r"DHCP IP acquired")
+DIAG_FIELDS = (
+    "uptime_s", "internal_free_b", "internal_min_b", "psram_free_b",
+    "psram_min_b", "main_stack_hwm_b", "network_stack_hwm_b",
+    "network_sample_age_s", "network_valid"
+)
 
 BLOCK_START = re.compile(r"Task watchdog got triggered|Guru Meditation|abort\(\) was called|Stack smashing|assert failed")
 
@@ -172,7 +183,7 @@ def main():
     wifi_events = analyze_wifi(rows)
     counts = {k: 0 for k in P}
     resets, stacks, keyboards, firmware, notes, port_events = [], [], [], {}, [], []
-    sntp_times, blocks = [], []
+    sntp_times, blocks, diags = [], [], []
     bad_kb = 0
     i = 0
     while i < len(rows):
@@ -197,6 +208,8 @@ def main():
                     bad_kb += 1
             elif key == "sntp":
                 sntp_times.append(t)
+            elif key == "diag":
+                diags.append(dict(zip(DIAG_FIELDS, map(int, m.groups()))))
         if BLOCK_START.search(text):
             blocks.append([(s, x) for s, _, x in rows[i:i + args.context]])
         i += 1
@@ -241,6 +254,21 @@ def main():
     print(f"scan failures: {counts['scan_fail']}   NVS save/forget failures: {counts['nvs_fail']}   "
           f"network step failures: {counts['net_fail']}")
     print(f"touch I2C errors: {counts['touch_err']}   LCD flush failures: {counts['lcd_err']}")
+    print(f"memory diagnostic samples: {len(diags)}")
+    if diags:
+        for field in ("internal_free_b", "internal_min_b", "psram_free_b",
+                      "psram_min_b", "main_stack_hwm_b", "network_stack_hwm_b"):
+            vals = [d[field] for d in diags
+                    if field != "network_stack_hwm_b" or d["network_valid"]]
+            if vals:
+                print(f"  {field}: first={vals[0]} last={vals[-1]}"
+                      f" min={min(vals)} max={max(vals)}")
+            else:
+                print(f"  {field}: unknown (no valid worker sample)")
+        ages = [d["network_sample_age_s"] for d in diags if d["network_valid"]]
+        if ages:
+            print(f"  network worker sample age (s): max={max(ages)}")
+        print("  Note: measurements are snapshots, not proof of memory stability")
     lost = [e for e in port_events if "port-lost" in e[1]]
     print(f"logger port losses: {len(lost)} (a reset or USB drop; check resets above)")
     if notes and not args.redact:
