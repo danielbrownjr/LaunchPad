@@ -101,6 +101,24 @@ class AgendaUiContract(unittest.TestCase):
         self.assertIn("if (view->row_count != s_last_row_count)", apply)
         self.assertIn("lv_obj_scroll_to_y(s_list, 0, LV_ANIM_OFF);", apply)
 
+    def test_empty_agenda_text_is_state_truthful(self):
+        # "No appointments" is only true for an accepted current/DEMO day.
+        self.assertNotIn("No appointments available", UI)
+        empty = re.search(r"static const char \*empty_text\(.*?\n\}", UI, flags=re.S).group(0)
+        trusted = empty[:empty.index('return "No appointments scheduled."')]
+        for state in ("LP_AGENDA_SCREEN_DEMO", "LP_AGENDA_SCREEN_CURRENT",
+                      "LP_AGENDA_SCREEN_NO_JOBS"):
+            self.assertIn(state, trusted)
+        for state in ("LP_AGENDA_SCREEN_NO_DATA", "LP_AGENDA_SCREEN_ERROR",
+                      "LP_AGENDA_SCREEN_CLOCK_UNSYNCED", "LP_AGENDA_SCREEN_STALE"):
+            self.assertNotIn(state, trusted)
+            self.assertIn(state, empty)
+        self.assertIn("update_text(s_empty, empty_text(view));", UI)
+        self.assertIn("update_text(s_preview_first, empty_text(view));", UI)
+
+    def test_last_known_preview_is_dimmed(self):
+        self.assertIn("set_muted(s_preview_first, view->dim_schedule);", UI)
+
     def test_fixed_geometry_inside_screen(self):
         # All top-level cards/overlays remain in the 800x480 viewport.
         for x, y, width, height in re.findall(

@@ -123,6 +123,24 @@ static lv_obj_t *close_button(lv_obj_t *parent)
     return button;
 }
 
+/* Without trustworthy rows, never claim an empty day: "no appointments" is
+ * only true for an accepted, current (or DEMO) schedule. */
+static const char *empty_text(const lp_agenda_vm_t *view)
+{
+    switch (view->state) {
+        case LP_AGENDA_SCREEN_DEMO:
+        case LP_AGENDA_SCREEN_CURRENT:
+        case LP_AGENDA_SCREEN_NO_JOBS: return "No appointments scheduled.";
+        case LP_AGENDA_SCREEN_NO_DATA: return "No schedule received yet.";
+        case LP_AGENDA_SCREEN_ERROR: return "Schedule source unavailable.";
+        case LP_AGENDA_SCREEN_CLOCK_UNSYNCED:
+            return "Clock not set; schedule unavailable.";
+        case LP_AGENDA_SCREEN_STALE:
+            return "No appointments in last-known schedule.";
+        default: return "Schedule data rejected.";
+    }
+}
+
 void lp_agenda_ui_create(lv_obj_t *root)
 {
     /* Left clock lives in dashboard.c. The right-hand card and lower agenda
@@ -148,7 +166,7 @@ void lp_agenda_ui_create(lv_obj_t *root)
     lv_obj_add_event_cb(s_summary, open_agenda, LV_EVENT_CLICKED, NULL);
     text_at(s_summary, "AGENDA  /  TAP TO VIEW ALL", 17, 10, 620,
             C_ACCENT, &lv_font_montserrat_14);
-    s_preview_first = text_at(s_summary, "No agenda received yet", 17, 39, 716,
+    s_preview_first = text_at(s_summary, "No schedule received yet.", 17, 39, 716,
                               C_TEXT, &lv_font_montserrat_14);
     s_preview_second = text_at(s_summary, "", 17, 68, 716,
                                C_MUTED, &lv_font_montserrat_14);
@@ -174,7 +192,7 @@ void lp_agenda_ui_create(lv_obj_t *root)
     lv_obj_set_style_border_width(list, 0, 0);
     lv_obj_set_style_pad_all(list, 0, 0);
     lv_obj_set_scroll_dir(list, LV_DIR_VER);
-    s_empty = text_at(list, "No appointments available.", 12, 25, 680,
+    s_empty = text_at(list, "No schedule received yet.", 12, 25, 680,
                       C_MUTED, &lv_font_montserrat_20);
 
     for (size_t i = 0; i < LP_AGENDA_MAX_ITEMS; ++i) {
@@ -197,7 +215,7 @@ static void show_preview(const lp_agenda_vm_t *view)
 {
     size_t shown = 0;
     char formatted[176];
-    update_text(s_preview_first, "No appointments available.");
+    update_text(s_preview_first, empty_text(view));
     update_text(s_preview_second, "");
     for (size_t i = 0; i < view->row_count && shown < 2; ++i) {
         const lp_agenda_vm_row_t *row = &view->rows[i];
@@ -242,10 +260,15 @@ void lp_agenda_ui_apply(const lp_agenda_vm_t *view)
     /* Style mutations trigger LVGL redraw work. Only restyle on an actual
      * dim-state transition, not on every once-per-second clock refresh. */
     bool restyle = !s_dim_initialized || s_last_dim != view->dim_schedule;
-    if (restyle) set_muted(s_hero_label, view->dim_schedule);
+    if (restyle) {
+        set_muted(s_hero_label, view->dim_schedule);
+        /* Last-known records on the home preview are dimmed as well. */
+        set_muted(s_preview_first, view->dim_schedule);
+    }
     show_preview(view);
 
     bool empty = view->row_count == 0;
+    update_text(s_empty, empty_text(view));
     if (empty) lv_obj_remove_flag(s_empty, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(s_empty, LV_OBJ_FLAG_HIDDEN);
 
