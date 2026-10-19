@@ -60,6 +60,22 @@ class LatinFontTests(unittest.TestCase):
                     cp = 0xA0 + i if i < 96 else PUNCT[i - 96]
                     self.assertIn(f"U+{cp:04X}", src)
 
+    def test_extended_glyphs_have_real_pixels_and_fit_existing_lines(self):
+        for px, line_height, base_line in ((14, 16, 3), (20, 22, 4)):
+            _, bitmap, entries = parse_font(px)
+            for cp in (0x00C1, 0x00E9, 0x00FC, 0x00E3, 0x00F1,
+                       0x00E7, 0x2014, 0x201C, 0x201D, 0x2026):
+                idx = cp - 0xA0 if cp < 0x100 else PUNCT.index(cp) + 96
+                offset, adv, w, h, x, y = entries[idx]
+                pixels = [((bitmap[offset + (i // 4)] >> (6 - 2 * (i % 4))) & 3)
+                          for i in range(w * h)]
+                self.assertGreater(adv, 0, (px, hex(cp)))
+                self.assertTrue(any(pixels), (px, hex(cp), "missing actual glyph pixels"))
+                self.assertLessEqual(h + y, line_height - base_line,
+                                     (px, hex(cp), "accent clipped at top"))
+                self.assertGreaterEqual(y, -base_line,
+                                        (px, hex(cp), "descender clipped at bottom"))
+
     def test_widget_text_uses_extended_fonts_but_clock_stays_montserrat(self):
         self.assertIn('"lp_font_latin1_14.c"', CM)
         self.assertIn('"lp_font_latin1_20.c"', CM)
