@@ -64,6 +64,14 @@ jobs:
              tests/stubs/freertos_semphr.c tests/test_agenda_demo.c \
              -o /tmp/launchpad-agenda-demo-test
           /tmp/launchpad-agenda-demo-test
+      - name: Native agenda presentation and freshness tests
+        run: |
+          cc -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -pthread \
+             -I main -I tests/stubs main/clock_util.c main/agenda_model.c \
+             main/agenda_store.c main/agenda_demo.c main/agenda_view.c \
+             tests/stubs/freertos_semphr.c tests/test_agenda_view.c \
+             -o /tmp/launchpad-agenda-view-test
+          /tmp/launchpad-agenda-view-test
       - name: ESP-IDF v6.0.3 / ESP32-P4 build
         uses: espressif/esp-idf-ci-action@v1
         with:
