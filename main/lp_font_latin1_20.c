@@ -219,7 +219,7 @@ static const uint8_t glyph_bitmap[] = {
     0x00, 0x00, 0x00, 0x00, 0x00,
 };
 static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
-    {0}
+    {0},
     { .bitmap_index=0, .adv_w=75, .box_w=0, .box_h=0, .ofs_x=0, .ofs_y=0 }, /* U+00A0 */
     { .bitmap_index=0, .adv_w=78, .box_w=6, .box_h=14, .ofs_x=0, .ofs_y=-4 }, /* U+00A1 */
     { .bitmap_index=21, .adv_w=165, .box_w=10, .box_h=12, .ofs_x=0, .ofs_y=0 }, /* U+00A2 */
