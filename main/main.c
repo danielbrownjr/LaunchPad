@@ -4,6 +4,7 @@
 
 #include "agenda_store.h"
 #include "agenda_demo.h"
+#include "clock_util.h"
 #include "board.h"
 #include "dashboard.h"
 #include "esp_err.h"
@@ -23,6 +24,16 @@
 
 #if CONFIG_ESP_MAIN_TASK_STACK_SIZE < 8192
 #error "LaunchPad UI main task requires at least 8 KiB stack"
+#endif
+
+/* The 64 KiB LVGL default reproduces an allocation-failure livelock with
+ * Settings + scanned APs (#51). Check the effective LVGL header, not only
+ * sdkconfig.defaults; changing the latter must actually reach LVGL. */
+#if LV_USE_STDLIB_MALLOC != LV_STDLIB_BUILTIN
+#error "LaunchPad LVGL memory accounting requires the builtin TLSF allocator"
+#endif
+#if LV_MEM_SIZE < (128U * 1024U)
+#error "S4 needs a verified LVGL TLSF pool of at least 128 KiB"
 #endif
 
 #define LVGL_TICK_MS 2
@@ -77,6 +88,9 @@ static void log_soak_diagnostics(int64_t uptime_s)
     const size_t psram_free = heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     const size_t psram_min = heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     const unsigned main_hwm = (unsigned)uxTaskGetStackHighWaterMark(NULL);
+    /* This code is called only by app_main, LVGL's sole owning task. */
+    lv_mem_monitor_t lv_mem = {0};
+    lv_mem_monitor(&lv_mem);
     const lp_network_diag_t worker = lp_network_diag_snapshot();
 
     /* All numbers are bytes except uptime/age seconds; zero network stack
@@ -85,12 +99,17 @@ static void log_soak_diagnostics(int64_t uptime_s)
              " internal_free_b=%u internal_min_b=%u"
              " psram_free_b=%u psram_min_b=%u"
              " main_stack_hwm_b=%u network_stack_hwm_b=%u"
-             " network_sample_age_s=%u network_valid=%u",
+             " network_sample_age_s=%u network_valid=%u"
+             " lvgl_pool_b=%u lvgl_free_b=%u lvgl_biggest_free_b=%u"
+             " lvgl_used_pct=%u lvgl_frag_pct=%u",
              uptime_s, (unsigned)internal_free, (unsigned)internal_min,
              (unsigned)psram_free, (unsigned)psram_min, main_hwm,
              worker.available ? (unsigned)worker.worker_stack_hwm_bytes : 0U,
              worker.available ? (unsigned)worker.sample_age_s : 0U,
-             worker.available ? 1U : 0U);
+             worker.available ? 1U : 0U,
+             (unsigned)lv_mem.total_size, (unsigned)lv_mem.free_size,
+             (unsigned)lv_mem.free_biggest_size,
+             (unsigned)lv_mem.used_pct, (unsigned)lv_mem.frag_pct);
 }
 #endif
 
@@ -115,6 +134,10 @@ void app_main(void)
     if (psram != 32U * 1024U * 1024U) {
         ESP_LOGW(TAG, "Expected 32 MiB PSRAM from module marking; actual size differs");
     }
+
+    /* Establish the Eastern display timezone before the first possible
+     * agenda time conversion on the LVGL task, even if C5 fails. */
+    lp_clock_timezone_init();
 
     /* Reserve the provider-neutral agenda store during single-task startup.
      * A failed mutex allocation must not prevent clock/network diagnostics;
@@ -190,6 +213,7 @@ void app_main(void)
              * Rebuild at Eastern day rollover, never on network status alone. */
             (void)lp_agenda_demo_poll((int64_t)time(NULL),
                                       lp_network_clock_valid());
+            lp_dashboard_update_agenda();
         }
 #if LP_SOAK_TELEMETRY_ENABLED
         if (second - last_diag_second >= LP_SOAK_DIAG_INTERVAL_S) {

@@ -4,6 +4,7 @@
  * Only bounded, nonblocking requests go to the network worker.
  */
 #include "wifi_ui.h"
+#include "dashboard.h"
 #include "network.h"
 #include "credentials.h"
 #include "wifi_keyboard.h"
@@ -207,12 +208,26 @@ static void forget_pressed(lv_event_t *event)
     s_ui.forget_confirm = false;
 }
 
+/* Called on the sole LVGL task after scan-result widgets have been built.
+ * Do not log AP names or credentials; this captures pool headroom immediately
+ * before LVGL may need a transient layer buffer during the next refresh. */
+static void log_scan_ui_memory(size_t ap_count)
+{
+    lv_mem_monitor_t mem = {0};
+    lv_mem_monitor(&mem);
+    ESP_LOGI(TAG, "LVGL_AP_LIST ap_count=%u pool_b=%u free_b=%u biggest_free_b=%u frag_pct=%u",
+             (unsigned)ap_count, (unsigned)mem.total_size,
+             (unsigned)mem.free_size, (unsigned)mem.free_biggest_size,
+             (unsigned)mem.frag_pct);
+}
+
 static void render_scan(void)
 {
     lp_network_scan_copy(&s_ui.snapshot);
     lv_obj_clean(s_ui.ap_list);
     if (s_ui.snapshot.count == 0) {
         lv_label_set_text(s_ui.message, "No visible networks. Try Scan or Manual SSID.");
+        log_scan_ui_memory(0);
         return;
     }
     lv_label_set_text(s_ui.message, "Tap a WPA network to configure it.");
@@ -231,6 +246,13 @@ static void render_scan(void)
             lv_obj_add_state(item, LV_STATE_DISABLED);
         }
     }
+    log_scan_ui_memory(s_ui.snapshot.count);
+}
+
+static void diagnostics_pressed(lv_event_t *event)
+{
+    (void)event;
+    lp_dashboard_open_diagnostics();
 }
 
 static void create_panel(lv_obj_t *root)
@@ -265,6 +287,8 @@ static void create_panel(lv_obj_t *root)
     button(s_ui.list_page, "Scan", 12, 287, 128, 40, scan_pressed);
     button(s_ui.list_page, "Manual SSID", 153, 287, 182, 40, manual_ssid);
     button(s_ui.list_page, "Forget saved", 350, 287, 170, 40, forget_pressed);
+    button(s_ui.list_page, "Diagnostics", 535, 287, 158, 40,
+           diagnostics_pressed);
 
     s_ui.form_page = lv_obj_create(s_ui.panel);
     lv_obj_set_pos(s_ui.form_page, 10, 52);
@@ -319,6 +343,9 @@ static void open_setup(lv_event_t *event)
     s_ui.forget_confirm = false;
     show_list();
     lv_obj_remove_flag(s_ui.panel, LV_OBJ_FLAG_HIDDEN);
+    /* The agenda overlay raises itself when opened; Settings must also be
+     * on top, or a later open renders hidden beneath that overlay. */
+    lv_obj_move_foreground(s_ui.panel);
     if (lp_network_scan_status() == LP_SCAN_READY) render_scan();
     else scan_pressed(NULL);
 }

@@ -28,6 +28,15 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 
 # LVGL 9.4.0 from an exact version constraint in main/idf_component.yml.
 CONFIG_LV_CONF_SKIP=y
+# S4 hardware watchdog (#51): LVGL's default 64 KiB TLSF pool cannot
+# allocate the Settings/AP-list draw layers. Exact LVGL 9.4.0 host repro:
+# 64 KiB livelocks; 128 KiB renders 2/6/12 scanned APs. Pin both allocator
+# and pool size; keep expansion disabled for deterministic memory accounting.
+# Do not infer heap safety from the device's 32 MiB PSRAM alone: LVGL's
+# builtin pool is a separately allocated static buffer in large-capable RAM.
+CONFIG_LV_USE_BUILTIN_MALLOC=y
+CONFIG_LV_MEM_SIZE_KILOBYTES=128
+CONFIG_LV_MEM_POOL_EXPAND_SIZE_KILOBYTES=0
 CONFIG_LV_COLOR_DEPTH_16=y
 CONFIG_LV_FONT_MONTSERRAT_14=y
 CONFIG_LV_FONT_MONTSERRAT_20=y

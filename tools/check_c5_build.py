@@ -50,6 +50,13 @@ for setting, value in {
 if "CONFIG_ESP_HOSTED_CP_TARGET_ESP32C61 1" in config:
     raise SystemExit("C61 coprocessor target accidentally enabled")
 
+# S4 issue #51: host LVGL 9.4 repro livelocks at 64 KiB and passes at 128 KiB.
+# Guard the *resolved target* Kconfig, not merely the sdkconfig.defaults text.
+# main.c independently checks the effective LV_MEM_SIZE seen by LVGL headers.
+require("CONFIG_LV_USE_BUILTIN_MALLOC", "1")
+require("CONFIG_LV_MEM_SIZE_KILOBYTES", "128")
+require("CONFIG_LV_MEM_POOL_EXPAND_SIZE_KILOBYTES", "0")
+
 size = image.stat().st_size
 capacity = 0x100000  # Existing factory app partition, independently verified.
 margin = capacity - size
