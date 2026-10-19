@@ -38,6 +38,7 @@ class LatinFontTests(unittest.TestCase):
             with self.subTest(px=px):
                 src, bitmap, entries = parse_font(px)
                 self.assertEqual(len(entries), 96 + len(PUNCT))
+                self.assertRegex(src, r"glyph_dsc\[\] = \{\s*\{0\},")
                 self.assertIn("range_start=0x00A0, .range_length=0x60", src)
                 self.assertIn("glyph_id_start=97", src)
                 self.assertIn("LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY", src)
