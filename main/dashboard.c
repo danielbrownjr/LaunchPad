@@ -1,4 +1,5 @@
 #include "dashboard.h"
+#include "lp_fonts.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -144,17 +145,17 @@ void lp_dashboard_open_diagnostics(void)
         lv_obj_set_style_border_width(s_diagnostics, 2, 0);
         lv_obj_set_style_border_color(s_diagnostics, lv_color_hex(0x39738C), 0);
         label_at(s_diagnostics, "LAUNCHPAD / DIAGNOSTICS", 19, 16, 600,
-                 0x80D7F3, &lv_font_montserrat_20);
+                 0x80D7F3, &lp_font_latin1_20);
         char detail[100];
         (void)snprintf(detail, sizeof(detail),
                        "ESP32-P4  |  PSRAM: %u MiB  |  TOUCH: %s",
                        (unsigned)(s_psram_bytes / (1024U * 1024U)),
                        s_touch_ready ? "I2C READY" : "OFFLINE");
         label_at(s_diagnostics, detail, 20, 74, 685, 0xF4F7FC,
-                 &lv_font_montserrat_20);
+                 &lp_font_latin1_20);
         label_at(s_diagnostics,
                  "RGB panel and touch fixture / engineering tools",
-                 20, 130, 680, 0xAEC1D7, &lv_font_montserrat_14);
+                 20, 130, 680, 0xAEC1D7, &lp_font_latin1_14);
 
         lv_obj_t *touch = lv_button_create(s_diagnostics);
         lv_obj_set_pos(touch, 20, 181);
@@ -162,7 +163,7 @@ void lp_dashboard_open_diagnostics(void)
         lv_obj_set_style_bg_color(touch, lv_color_hex(0x246B88), 0);
         lv_obj_t *touch_label = label_at(touch, s_touch_ready ?
                               "TAP TO TEST" : "TOUCH OFFLINE", 20, 14, 245,
-                              0xFFFFFF, &lv_font_montserrat_14);
+                              0xFFFFFF, &lp_font_latin1_14);
         if (s_touch_ready)
             lv_obj_add_event_cb(touch, touch_test_clicked, LV_EVENT_CLICKED,
                                 touch_label);
@@ -176,13 +177,21 @@ void lp_dashboard_open_diagnostics(void)
             lv_obj_set_style_radius(swatch, 5, 0);
         }
 
+        /* Read-only fictional typography fixture for physical glyph QA.
+         * Covers Latin-1 accents, curved quotes and dashes at both sizes.
+         * No provider data, NVS or network calls are involved. */
+        label_at(s_diagnostics, "Café Müller — São Paulo | Zoë, garçon",
+                 20, 349, 722, 0xF4F7FC, &lp_font_latin1_20);
+        label_at(s_diagnostics, "Résumé “façade” – mañana, crème brûlée",
+                 20, 384, 722, 0xAEC1D7, &lp_font_latin1_14);
+
         lv_obj_t *close = lv_button_create(s_diagnostics);
         lv_obj_set_pos(close, 647, 12);
         lv_obj_set_size(close, 95, 45);
         lv_obj_set_style_bg_color(close, lv_color_hex(0x246B88), 0);
         lv_obj_t *caption = lv_label_create(close);
         lv_label_set_text(caption, "Close");
-        lv_obj_set_style_text_font(caption, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(caption, &lp_font_latin1_14, 0);
         lv_obj_set_style_text_color(caption, lv_color_hex(0xFFFFFF), 0);
         lv_obj_center(caption);
         lv_obj_add_event_cb(close, close_diagnostics, LV_EVENT_CLICKED, NULL);
@@ -202,24 +211,24 @@ void lp_dashboard_create(lv_display_t *display, size_t psram_bytes, bool touch_r
     lv_obj_remove_flag(root, LV_OBJ_FLAG_SCROLLABLE);
 
     label_at(root, "LAUNCHPAD", 26, 17, 400, 0x80D7F3,
-             &lv_font_montserrat_20);
+             &lp_font_latin1_20);
 
     lv_obj_t *clock = card_at(root, 24, 66, 265, 246, 0x14263D);
     label_at(clock, "LOCAL TIME", 16, 18, 225, 0x9FB4CC,
-             &lv_font_montserrat_14);
+             &lp_font_latin1_14);
     s_clock_label = label_at(clock, "--:--", 15, 58, 236, 0xF4F7FC,
                              &lv_font_montserrat_40);
     s_clock_status = label_at(clock, "CLOCK NOT SET", 16, 131, 235,
-                              0xF9BE62, &lv_font_montserrat_20);
+                              0xF9BE62, &lp_font_latin1_20);
     s_clock_detail = label_at(clock, "Waiting for NTP sync", 16, 187, 235,
-                              0xAABBCF, &lv_font_montserrat_14);
+                              0xAABBCF, &lp_font_latin1_14);
 
     lp_agenda_ui_create(root);
 
     s_psram_bytes = psram_bytes;
     s_touch_ready = touch_ready;
     s_footer = label_at(root, "NETWORK: C5 OFF", 26, 446, 744, 0xA6BBCF,
-                        &lv_font_montserrat_14);
+                        &lp_font_latin1_14);
     /* Force first status render, even when the device remains C5_OFF. */
     s_net_state = LP_NET_ERROR;
     lp_dashboard_set_network_state(LP_NET_OFF);
