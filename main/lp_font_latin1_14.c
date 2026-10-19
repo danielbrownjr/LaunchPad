@@ -118,7 +118,7 @@ static const uint8_t glyph_bitmap[] = {
     0x49, 0x98, 0x14, 0x88, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
-    {0}
+    {0},
     { .bitmap_index=0, .adv_w=54, .box_w=0, .box_h=0, .ofs_x=0, .ofs_y=0 }, /* U+00A0 */
     { .bitmap_index=0, .adv_w=56, .box_w=4, .box_h=10, .ofs_x=0, .ofs_y=-3 }, /* U+00A1 */
     { .bitmap_index=10, .adv_w=119, .box_w=7, .box_h=9, .ofs_x=0, .ofs_y=0 }, /* U+00A2 */
