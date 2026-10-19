@@ -177,6 +177,14 @@ void lp_dashboard_open_diagnostics(void)
             lv_obj_set_style_radius(swatch, 5, 0);
         }
 
+        /* Read-only fictional typography fixture for physical glyph QA.
+         * Covers Latin-1 accents, curved quotes and dashes at both sizes.
+         * No provider data, NVS or network calls are involved. */
+        label_at(s_diagnostics, "Café Müller — São Paulo | Zoë, garçon",
+                 20, 349, 722, 0xF4F7FC, &lp_font_latin1_20);
+        label_at(s_diagnostics, "Résumé “façade” – mañana, crème brûlée",
+                 20, 384, 722, 0xAEC1D7, &lp_font_latin1_14);
+
         lv_obj_t *close = lv_button_create(s_diagnostics);
         lv_obj_set_pos(close, 647, 12);
         lv_obj_set_size(close, 95, 45);
