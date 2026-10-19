@@ -4,6 +4,7 @@
  * Only bounded, nonblocking requests go to the network worker.
  */
 #include "wifi_ui.h"
+#include "lp_fonts.h"
 #include "dashboard.h"
 #include "network.h"
 #include "credentials.h"
@@ -47,7 +48,7 @@ static lv_obj_t *label(lv_obj_t *parent, const char *text, int x, int y, int wid
     lv_obj_set_width(obj, width);
     lv_label_set_long_mode(obj, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_style_text_color(obj, lv_color_hex(0xE3EDF8), 0);
-    lv_obj_set_style_text_font(obj, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(obj, &lp_font_latin1_14, 0);
     return obj;
 }
 
@@ -61,7 +62,7 @@ static lv_obj_t *button(lv_obj_t *parent, const char *text,
     lv_obj_set_style_bg_color(obj, lv_color_hex(0x256B88), 0);
     lv_obj_t *caption = lv_label_create(obj);
     lv_label_set_text(caption, text);
-    lv_obj_set_style_text_font(caption, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(caption, &lp_font_latin1_14, 0);
     lv_obj_center(caption);
     if (callback) lv_obj_add_event_cb(obj, callback, LV_EVENT_CLICKED, NULL);
     return obj;
@@ -282,6 +283,8 @@ static void create_panel(lv_obj_t *root)
     s_ui.saved = label(s_ui.list_page, "Saved: none", 12, 5, 670);
     s_ui.message = label(s_ui.list_page, "Scan to find nearby networks.", 12, 33, 670);
     s_ui.ap_list = lv_list_create(s_ui.list_page);
+    /* Scanned SSIDs are untrusted UTF-8 text; inherit the fallback font. */
+    lv_obj_set_style_text_font(s_ui.ap_list, &lp_font_latin1_14, 0);
     lv_obj_set_pos(s_ui.ap_list, 12, 65);
     lv_obj_set_size(s_ui.ap_list, 682, 210);
     button(s_ui.list_page, "Scan", 12, 287, 128, 40, scan_pressed);
@@ -299,12 +302,14 @@ static void create_panel(lv_obj_t *root)
     lv_obj_remove_flag(s_ui.form_page, LV_OBJ_FLAG_SCROLLABLE);
     label(s_ui.form_page, "Network", 12, 12, 115);
     s_ui.ssid = lv_textarea_create(s_ui.form_page);
+    lv_obj_set_style_text_font(s_ui.ssid, &lp_font_latin1_14, 0);
     lv_obj_set_pos(s_ui.ssid, 120, 2);
     lv_obj_set_size(s_ui.ssid, 560, 44);
     lv_textarea_set_one_line(s_ui.ssid, true);
     lv_textarea_set_max_length(s_ui.ssid, LP_SSID_MAX);
     label(s_ui.form_page, "Password", 12, 66, 115);
     s_ui.password = lv_textarea_create(s_ui.form_page);
+    lv_obj_set_style_text_font(s_ui.password, &lp_font_latin1_14, 0);
     lv_obj_set_pos(s_ui.password, 120, 55);
     lv_obj_set_size(s_ui.password, 560, 44);
     lv_textarea_set_one_line(s_ui.password, true);
@@ -359,12 +364,12 @@ void lp_wifi_ui_init(lv_obj_t *root, bool touch_ready)
     lv_obj_set_style_border_width(open, 0, 0);
     lv_obj_t *gear = lv_obj_get_child(open, 0);
     lv_obj_set_style_text_color(gear, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_text_font(gear, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(gear, &lp_font_latin1_20, 0);
     lv_obj_set_style_bg_opa(gear, LV_OPA_TRANSP, 0);
     if (!touch_ready) lv_obj_add_state(open, LV_STATE_DISABLED);
 
     s_ui.wifi_indicator = label(root, LV_SYMBOL_WIFI, 737, 20, 39);
-    lv_obj_set_style_text_font(s_ui.wifi_indicator, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(s_ui.wifi_indicator, &lp_font_latin1_20, 0);
     lv_obj_set_style_text_color(s_ui.wifi_indicator, lv_color_hex(0x87919F), 0);
     s_ui.connected_indicator = false;
 }
