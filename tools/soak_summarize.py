@@ -48,6 +48,10 @@ P = {
         r" psram_free_b=(\d+) psram_min_b=(\d+) main_stack_hwm_b=(\d+)"
         r" network_stack_hwm_b=(\d+) network_sample_age_s=(\d+)"
         r" network_valid=(\d+)"
+        # Optional LVGL metrics in S4+; old captures end at network_valid.
+        r"(?: lvgl_pool_b=(\d+) lvgl_free_b=(\d+)"
+        r" lvgl_biggest_free_b=(\d+) lvgl_used_pct=(\d+)"
+        r" lvgl_frag_pct=(\d+))?"
     ),
     "wdt": re.compile(r"Task watchdog got triggered"),
     "panic": re.compile(r"Guru Meditation|abort\(\) was called|Stack smashing|stack overflow|assert failed"),
@@ -59,7 +63,9 @@ WIFI_IP = re.compile(r"DHCP IP acquired")
 DIAG_FIELDS = (
     "uptime_s", "internal_free_b", "internal_min_b", "psram_free_b",
     "psram_min_b", "main_stack_hwm_b", "network_stack_hwm_b",
-    "network_sample_age_s", "network_valid"
+    "network_sample_age_s", "network_valid",
+    "lvgl_pool_b", "lvgl_free_b", "lvgl_biggest_free_b",
+    "lvgl_used_pct", "lvgl_frag_pct"
 )
 DIAG_PERIOD_S = 3600
 DIAG_SLACK_S = 300
@@ -220,7 +226,11 @@ def main():
             elif key == "sntp":
                 sntp_times.append(t)
             elif key == "diag":
-                diag = dict(zip(DIAG_FIELDS, map(int, m.groups())))
+                # Old firmware omitted LVGL fields; absent != zero.
+                diag = dict(zip(DIAG_FIELDS, (
+                    int(value) if value is not None else None
+                    for value in m.groups()
+                )))
                 diag["stamp"], diag["t"] = stamp, t
                 diags.append(diag)
         if BLOCK_START.search(text):
@@ -301,6 +311,14 @@ def main():
                       f" min={min(vals)} max={max(vals)}")
             else:
                 print(f"  {field}: unknown (no valid worker sample)")
+        for field in ("lvgl_pool_b", "lvgl_free_b",
+                      "lvgl_biggest_free_b", "lvgl_used_pct", "lvgl_frag_pct"):
+            vals = [d[field] for d in diags if d[field] is not None]
+            if vals:
+                print(f"  {field}: first={vals[0]} last={vals[-1]}"
+                      f" min={min(vals)} max={max(vals)}")
+            else:
+                print(f"  {field}: unknown (not emitted by this firmware)")
         ages = [d["network_sample_age_s"] for d in diags if d["network_valid"]]
         if ages:
             print(f"  network worker sample age (s): max={max(ages)}")
