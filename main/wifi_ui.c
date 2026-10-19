@@ -208,12 +208,26 @@ static void forget_pressed(lv_event_t *event)
     s_ui.forget_confirm = false;
 }
 
+/* Called on the sole LVGL task after scan-result widgets have been built.
+ * Do not log AP names or credentials; this captures pool headroom immediately
+ * before LVGL may need a transient layer buffer during the next refresh. */
+static void log_scan_ui_memory(size_t ap_count)
+{
+    lv_mem_monitor_t mem = {0};
+    lv_mem_monitor(&mem);
+    ESP_LOGI(TAG, "LVGL_AP_LIST ap_count=%u pool_b=%u free_b=%u biggest_free_b=%u frag_pct=%u",
+             (unsigned)ap_count, (unsigned)mem.total_size,
+             (unsigned)mem.free_size, (unsigned)mem.free_biggest_size,
+             (unsigned)mem.frag_pct);
+}
+
 static void render_scan(void)
 {
     lp_network_scan_copy(&s_ui.snapshot);
     lv_obj_clean(s_ui.ap_list);
     if (s_ui.snapshot.count == 0) {
         lv_label_set_text(s_ui.message, "No visible networks. Try Scan or Manual SSID.");
+        log_scan_ui_memory(0);
         return;
     }
     lv_label_set_text(s_ui.message, "Tap a WPA network to configure it.");
@@ -232,6 +246,7 @@ static void render_scan(void)
             lv_obj_add_state(item, LV_STATE_DISABLED);
         }
     }
+    log_scan_ui_memory(s_ui.snapshot.count);
 }
 
 static void diagnostics_pressed(lv_event_t *event)

@@ -268,6 +268,25 @@ class SoakTools(unittest.TestCase):
         self.assertLess(LOGGER.index("port.dtr = False"), LOGGER.index("port.open()"))
         self.assertLess(LOGGER.index("port.rts = False"), LOGGER.index("port.open()"))
 
+    def test_lvgl_metrics_and_legacy_diag_are_both_supported(self):
+        summary = load_summarizer()
+        old = ("DIAG uptime_s=1 internal_free_b=320000 internal_min_b=280000"
+               " psram_free_b=30000000 psram_min_b=28000000"
+               " main_stack_hwm_b=4800 network_stack_hwm_b=6000"
+               " network_sample_age_s=0 network_valid=1")
+        new = (old + " lvgl_pool_b=131072 lvgl_free_b=32000"
+               " lvgl_biggest_free_b=25000 lvgl_used_pct=75 lvgl_frag_pct=7")
+        self.assertEqual(len(summary.P["diag"].fullmatch(old).groups()),
+                         len(summary.DIAG_FIELDS))
+        self.assertEqual(summary.P["diag"].fullmatch(old).groups()[-5:],
+                         (None,) * 5)
+        self.assertEqual(
+            tuple(map(int, summary.P["diag"].fullmatch(new).groups()))[-5:],
+            (131072, 32000, 25000, 75, 7)
+        )
+        self.assertIsNone(summary.P["diag"].fullmatch(new +
+                                                       " unexpected_field=1"))
+
     def test_firmware_diag_format_matches_real_summarizer(self):
         """Render the *actual C format* with sample numbers and parse it.
 
